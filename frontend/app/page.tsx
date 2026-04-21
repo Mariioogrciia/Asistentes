@@ -5,6 +5,79 @@ import { useRouter } from "next/navigation";
 import { api, type Assistant } from "@/lib/api";
 import styles from "./page.module.css";
 
+// ── SVG icon set ───────────────────────────────────────────────────────────────
+
+function IconFiles() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
+  );
+}
+
+function IconSearch() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <line x1="8" y1="11" x2="14" y2="11"/>
+      <line x1="11" y1="8" x2="11" y2="14"/>
+    </svg>
+  );
+}
+
+function IconChat() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  );
+}
+
+function IconLogoMark() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M8 1.5l1.6 4.9H15L10.7 9.6l1.6 4.9L8 11.9l-4.3 2.6 1.6-4.9L1 6.4h5.4z" fill="currentColor" opacity="0.9"/>
+    </svg>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path d="M8 1v14M1 8h14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function IconRobot() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="10" rx="2"/>
+      <path d="M12 11V7"/>
+      <circle cx="12" cy="5" r="2"/>
+      <path d="M8 15h1M15 15h1"/>
+    </svg>
+  );
+}
+
+function IconWarning() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  );
+}
+
+
+// ── Page ───────────────────────────────────────────────────────────────────────
+
 export default function HomePage() {
   const router = useRouter();
   const [assistants, setAssistants] = useState<Assistant[]>([]);
@@ -16,42 +89,48 @@ export default function HomePage() {
   useEffect(() => {
     api.assistants.list()
       .then(setAssistants)
-      .catch((err) => setError("Error al conectar con el servidor (¿Está el backend encendido?)"))
+      .catch(() => setError("No se puede conectar con el servidor. ¿Está el backend activo?"))
       .finally(() => setLoading(false));
   }, []);
 
   return (
     <main className={styles.main}>
-      {/* Header */}
+      {/* ── Navbar ──────────────────────────────────────────────────────────── */}
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <div className={styles.logo}>
-            <span className={styles.logoIcon}>✦</span>
-            <span>RAG Assistants</span>
+            <div className={styles.logoMark}>
+              <IconLogoMark />
+            </div>
+            RAG Assistants
           </div>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 1v14M1 8h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+            <IconPlus />
             Nuevo asistente
           </button>
         </div>
       </header>
 
-      {/* Content */}
       <div className={styles.content}>
-        {/* Landing Hero */}
-        <section className={styles.landingHero}>
-          <div className={styles.landingBadge}>V2.0 Ya Disponible ✨</div>
-          <h1 className={styles.landingTitle}>
-            Dale superpoderes a tus <span>documentos</span>
+        {/* ── Hero ────────────────────────────────────────────────────────── */}
+        <section className={styles.hero}>
+          <div className={styles.heroBadge}>
+            <span className={styles.heroBadgeDot} />
+            V2.0 · Ya disponible
+          </div>
+
+          <h1 className={styles.heroTitle}>
+            Tus documentos,<br />
+            <span className={styles.heroTitleAccent}>convertidos en IA</span>
           </h1>
-          <p className={styles.landingSubtitle}>
-            Crea asistentes de Inteligencia Artificial personalizados. Sube tus PDFs, Word o TXT y chatea con ellos al instante usando tecnología RAG avanzada.
+
+          <p className={styles.heroSubtitle}>
+            Crea asistentes inteligentes sobre tus propios archivos. Sube PDFs, Word o Markdown y chatea con ellos al instante usando búsqueda vectorial avanzada.
           </p>
+
           <div className={styles.heroActions}>
-            <button 
-              className="btn btn-primary btn-lg" 
+            <button
+              className="btn btn-primary btn-lg"
               onClick={() => {
                 if (assistants.length === 0) setShowModal(true);
                 else document.getElementById("dashboard")?.scrollIntoView({ behavior: "smooth" });
@@ -59,76 +138,99 @@ export default function HomePage() {
             >
               Comenzar ahora
             </button>
-            <a href="https://github.com/Mariioogrciia/Asistentes" target="_blank" rel="noreferrer" className="btn btn-ghost btn-lg">
-              Ver GitHub
+            <a
+              href="https://github.com/Mariioogrciia/Asistentes"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-ghost btn-lg"
+            >
+              Ver en GitHub
             </a>
           </div>
         </section>
 
-        {/* Features */}
+        {/* ── Features ────────────────────────────────────────────────────── */}
+        <div className={styles.divider} />
+
+        <p className={styles.featuresLabel}>Cómo funciona</p>
+
         <section className={styles.featuresGrid}>
           <div className={styles.featureCard}>
-            <div className={styles.featureIcon}>📁</div>
-            <h3 className={styles.featureTitle}>Sube tus Archivos</h3>
-            <p className={styles.featureDesc}>PDFs, Docs, PPTX o Markdown. Tu conocimiento centralizado.</p>
+            <div className={styles.featureIconWrap}><IconFiles /></div>
+            <h3 className={styles.featureTitle}>Ingesta de documentos</h3>
+            <p className={styles.featureDesc}>PDFs, DOCX, PPTX y Markdown. Tu base de conocimiento centralizada, lista para ser consultada.</p>
           </div>
           <div className={styles.featureCard}>
-            <div className={styles.featureIcon}>⚡</div>
-            <h3 className={styles.featureTitle}>Búsqueda Vectorial</h3>
-            <p className={styles.featureDesc}>Motor RAG ultra-rápido para encontrar respuestas precisas en milisegundos.</p>
+            <div className={styles.featureIconWrap}><IconSearch /></div>
+            <h3 className={styles.featureTitle}>Búsqueda semántica</h3>
+            <p className={styles.featureDesc}>Motor RAG con embeddings vectoriales para encontrar respuestas precisas en milisegundos.</p>
           </div>
           <div className={styles.featureCard}>
-            <div className={styles.featureIcon}>💬</div>
-            <h3 className={styles.featureTitle}>Chat en Tiempo Real</h3>
-            <p className={styles.featureDesc}>Conversa fluidamente con modelos de IA viendo cómo se genera el texto palabra a palabra.</p>
+            <div className={styles.featureIconWrap}><IconChat /></div>
+            <h3 className={styles.featureTitle}>Chat con streaming</h3>
+            <p className={styles.featureDesc}>Conversaciones fluidas en tiempo real. Ves cómo el modelo genera cada palabra mientras responde.</p>
           </div>
         </section>
 
-        {/* Dashboard Section */}
+        {/* ── Dashboard ───────────────────────────────────────────────────── */}
         <section id="dashboard" className={styles.dashboardSection}>
           <div className={styles.dashboardHeader}>
-            <h2>Tus asistentes IA</h2>
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-              + Nuevo asistente
+            <div className={styles.dashboardTitleGroup}>
+              <span className={styles.dashboardTitle}>Tus asistentes</span>
+              {!loading && !error && assistants.length > 0 && (
+                <span className={styles.dashboardSubtitle}>{assistants.length} asistente{assistants.length !== 1 ? "s" : ""} configurado{assistants.length !== 1 ? "s" : ""}</span>
+              )}
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowModal(true)}>
+              <IconPlus />
+              Nuevo
             </button>
           </div>
 
-        {loading ? (
-          <div className={styles.loadingGrid}>
-            {[1,2,3].map(i => <div key={i} className={styles.skeleton} />)}
-          </div>
-        ) : error ? (
-          <div className="empty">
-            <div className="empty-icon" style={{ opacity: 1 }}>⚠️</div>
-            <h3>{error}</h3>
-            <p>Abre la consola para más detalles o inicia el servidor de FastAPI.</p>
-          </div>
-        ) : assistants.length === 0 ? (
-          <div className="empty">
-            <div className="empty-icon">🤖</div>
-            <h3>Sin asistentes todavía</h3>
-            <p>Crea tu primer asistente para empezar a chatear con tus documentos.</p>
-            <button className="btn btn-primary btn-lg" style={{marginTop: "1rem"}} onClick={() => setShowModal(true)}>
-              Crear primer asistente
-            </button>
-          </div>
-        ) : (
-          <div className={styles.grid}>
-            {assistants.map((a, i) => (
-              <AssistantCard
-                key={a.id}
-                assistant={a}
-                style={{ animationDelay: `${i * 50}ms` }}
-                onClick={() => router.push(`/assistants/${a.id}`)}
-                onDeleteRequest={() => setAssistantToDelete(a)}
-              />
-            ))}
-          </div>
-        )}
+          {loading ? (
+            <div className={styles.loadingGrid}>
+              {[1, 2, 3].map(i => <div key={i} className={styles.skeleton} />)}
+            </div>
+          ) : error ? (
+            <div className={styles.emptyDash}>
+              <div className={styles.emptyDashIcon} style={{ color: "var(--error)" }}>
+                <IconWarning />
+              </div>
+              <h3 style={{ color: "var(--error)" }}>Sin conexión con el servidor</h3>
+              <p>{error}</p>
+            </div>
+          ) : assistants.length === 0 ? (
+            <div className={styles.emptyDash}>
+              <div className={styles.emptyDashIcon}>
+                <IconRobot />
+              </div>
+              <h3>Sin asistentes todavía</h3>
+              <p>Crea tu primer asistente para empezar a chatear con tus documentos.</p>
+              <button
+                className="btn btn-primary"
+                style={{ marginTop: "0.75rem" }}
+                onClick={() => setShowModal(true)}
+              >
+                <IconPlus /> Crear asistente
+              </button>
+            </div>
+          ) : (
+            <div className={styles.grid}>
+              {assistants.map((a, i) => (
+                <AssistantCard
+                  key={a.id}
+                  assistant={a}
+                  style={{ animationDelay: `${i * 40}ms` }}
+                  onClick={() => router.push(`/assistants/${a.id}`)}
+                  onDeleteRequest={() => setAssistantToDelete(a)}
+                />
+              ))}
+            </div>
+          )}
         </section>
       </div>
 
-      {/* Create Modal */}
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {showModal && (
         <CreateAssistantModal
           onClose={() => setShowModal(false)}
@@ -139,7 +241,6 @@ export default function HomePage() {
           }}
         />
       )}
-      {/* Delete Confirmation Modal */}
       {assistantToDelete && (
         <DeleteAssistantModal
           assistant={assistantToDelete}
@@ -150,7 +251,7 @@ export default function HomePage() {
             try {
               await api.assistants.delete(id);
               setAssistants(prev => prev.filter(x => x.id !== id));
-            } catch (err) {
+            } catch {
               alert("Error al eliminar el asistente.");
             }
           }}
@@ -173,16 +274,9 @@ function AssistantCard({
   onClick: () => void;
   onDeleteRequest: () => void;
 }) {
-  const [deleting, setDeleting] = useState(false);
-
-  async function handleDelete(e: React.MouseEvent) {
-    e.stopPropagation();
-    onDeleteRequest();
-  }
-
   return (
     <div
-      className={`card ${styles.assistantCard}`}
+      className={`card ${styles.assistantCard} anim-fadeinup`}
       style={style}
       onClick={onClick}
       role="button"
@@ -195,24 +289,29 @@ function AssistantCard({
         </div>
         <button
           className={`btn btn-icon btn-danger btn-sm ${styles.deleteBtn}`}
-          onClick={handleDelete}
-          disabled={deleting}
+          onClick={e => { e.stopPropagation(); onDeleteRequest(); }}
           title="Eliminar asistente"
         >
-          {deleting ? <span className="spinner" style={{width:14,height:14}} /> : "✕"}
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <path d="M1 1l10 10M11 1L1 11"/>
+          </svg>
         </button>
       </div>
+
       <div className={styles.cardBody}>
         <h3 className={styles.cardName}>{assistant.name}</h3>
         {assistant.description && (
-          <p className={`text-sm text-secondary truncate ${styles.cardDesc}`}>{assistant.description}</p>
+          <p className={`${styles.cardDesc} truncate`}>{assistant.description}</p>
         )}
       </div>
+
       <div className={styles.cardFooter}>
         <span className="text-xs text-muted">
-          {new Date(assistant.created_at).toLocaleDateString("es-ES")}
+          {new Date(assistant.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}
         </span>
-        <span className={styles.chatBtn}>Chat →</span>
+        <span className={styles.chatBtn}>
+          Chat <span className={styles.chatArrow}>→</span>
+        </span>
       </div>
     </div>
   );
@@ -255,7 +354,11 @@ function CreateAssistantModal({
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Nuevo asistente</h2>
-          <button className="btn btn-icon btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn btn-icon btn-ghost" onClick={onClose}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M1 1l12 12M13 1L1 13"/>
+            </svg>
+          </button>
         </div>
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className="field">
@@ -263,18 +366,18 @@ function CreateAssistantModal({
             <input id="name" className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Asistente Legal" required />
           </div>
           <div className="field">
-            <label htmlFor="desc">Descripción</label>
-            <input id="desc" className="input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Opcional — para qué sirve este asistente" />
+            <label htmlFor="desc">Descripción <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(opcional)</span></label>
+            <input id="desc" className="input" value={description} onChange={e => setDescription(e.target.value)} placeholder="¿Para qué sirve este asistente?" />
           </div>
           <div className="field">
-            <label htmlFor="instr">Instrucciones (system prompt) *</label>
+            <label htmlFor="instr">System prompt *</label>
             <textarea id="instr" className="textarea" value={instructions} onChange={e => setInstructions(e.target.value)} rows={5} required />
           </div>
-          {error && <p className="text-sm" style={{color: "var(--error)"}}>{error}</p>}
+          {error && <p className="text-sm" style={{ color: "var(--error)" }}>{error}</p>}
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={loading || !name.trim()}>
-              {loading ? <><span className="spinner" />Creando...</> : "Crear asistente"}
+              {loading ? <><span className="spinner" /> Creando...</> : "Crear asistente"}
             </button>
           </div>
         </form>
@@ -297,22 +400,26 @@ function DeleteAssistantModal({
   async function handleConfirm() {
     setIsDeleting(true);
     await onConfirm();
-    setIsDeleting(false); // Only reached if error, otherwise unmounted
+    setIsDeleting(false);
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "400px" }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "420px" }}>
         <div className="modal-header">
-          <h2 style={{ color: "var(--error)" }}>¿Eliminar asistente?</h2>
-          <button className="btn btn-icon btn-ghost" onClick={onClose} disabled={isDeleting}>✕</button>
+          <h2 style={{ color: "var(--error)", fontSize: "1.0625rem" }}>Eliminar asistente</h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose} disabled={isDeleting}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M1 1l12 12M13 1L1 13"/>
+            </svg>
+          </button>
         </div>
-        <div style={{ marginBottom: "1.5rem" }}>
+        <div style={{ marginBottom: "0.5rem" }}>
           <p className="text-sm">
-            Estás a punto de eliminar a <strong>{assistant.name}</strong>.
+            Estás a punto de eliminar <strong style={{ color: "var(--text-primary)" }}>{assistant.name}</strong>.
           </p>
-          <p className="text-sm" style={{ marginTop: "0.5rem", color: "var(--text-muted)" }}>
-            Esta acción es irreversible. Se borrarán definitivamente todos sus <strong>documentos del Storage, las conversaciones y toda su configuración</strong> de la base de datos.
+          <p className="text-sm" style={{ marginTop: "0.625rem", color: "var(--text-muted)" }}>
+            Esta acción es <strong style={{ color: "var(--error)" }}>irreversible</strong>. Se borrarán todos sus documentos del Storage, las conversaciones y la configuración.
           </p>
         </div>
         <div className="modal-footer">
