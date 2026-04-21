@@ -273,25 +273,27 @@ function ChatPanel({
       </div>
 
       <div className={styles.inputArea}>
-        <textarea
-          ref={textareaRef}
-          className={`input ${styles.chatInput}`}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Escribe tu pregunta… (Enter para enviar, Shift+Enter para nueva línea)"
-          rows={1}
-          disabled={streaming}
-          style={{ resize: "none", overflowY: "auto", maxHeight: "120px" }}
-        />
-        <button
-          className={`btn btn-primary ${styles.sendBtn}`}
-          onClick={handleSend}
-          disabled={!input.trim() || streaming}
-          title="Enviar"
-        >
-          {streaming ? <span className="spinner" style={{ width: 18, height: 18, borderTopColor: "#fff" }} /> : "↑"}
-        </button>
+        <div className={styles.inputContainer}>
+          <textarea
+            ref={textareaRef}
+            className={`input ${styles.chatInput}`}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Escribe tu pregunta… (Enter para enviar, Shift+Enter para nueva línea)"
+            rows={1}
+            disabled={streaming}
+            style={{ resize: "none", overflowY: "auto", maxHeight: "150px" }}
+          />
+          <button
+            className={`btn ${styles.sendBtn}`}
+            onClick={handleSend}
+            disabled={!input.trim() || streaming}
+            title="Enviar"
+          >
+            {streaming ? <span className="spinner" style={{ width: 18, height: 18, borderTopColor: "currentColor" }} /> : "↑"}
+          </button>
+        </div>
       </div>
     </div>
   );
