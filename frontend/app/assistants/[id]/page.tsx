@@ -244,7 +244,11 @@ function ChatPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Evita el comportamiento de "subir iterativamente" o saltos durante el streaming
+    bottomRef.current?.scrollIntoView({ 
+      behavior: streaming ? "auto" : "smooth",
+      block: "end"
+    });
   }, [messages, streaming]);
 
   async function handleSend() {
