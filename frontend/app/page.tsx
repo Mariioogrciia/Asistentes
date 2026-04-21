@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type Assistant } from "@/lib/api";
 import styles from "./page.module.css";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { GalaxyBackground } from "@/components/GalaxyBackground";
 
 // ── SVG icon set ───────────────────────────────────────────────────────────────
 
@@ -93,8 +95,23 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add(styles.visible);
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll(`.${styles.reveal}`).forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, [assistants]);
+
   return (
     <main className={styles.main}>
+      <GalaxyBackground />
       {/* ── Navbar ──────────────────────────────────────────────────────────── */}
       <header className={styles.header}>
         <div className={styles.headerInner}>
@@ -104,16 +121,19 @@ export default function HomePage() {
             </div>
             RAG Assistants
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
-            <IconPlus />
-            Nuevo asistente
-          </button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <ThemeToggle />
+            <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+              <IconPlus />
+              Nuevo asistente
+            </button>
+          </div>
         </div>
       </header>
 
       <div className={styles.content}>
         {/* ── Hero ────────────────────────────────────────────────────────── */}
-        <section className={styles.hero}>
+        <section className={`${styles.hero} ${styles.reveal}`}>
           <div className={styles.heroBadge}>
             <span className={styles.heroBadgeDot} />
             V2.0 · Ya disponible
@@ -152,9 +172,9 @@ export default function HomePage() {
         {/* ── Features ────────────────────────────────────────────────────── */}
         <div className={styles.divider} />
 
-        <p className={styles.featuresLabel}>Cómo funciona</p>
+        <p className={`${styles.featuresLabel} ${styles.reveal}`}>Cómo funciona</p>
 
-        <section className={styles.featuresGrid}>
+        <section className={`${styles.featuresGrid} ${styles.reveal}`} style={{ transitionDelay: "150ms" }}>
           <div className={styles.featureCard}>
             <div className={styles.featureIconWrap}><IconFiles /></div>
             <h3 className={styles.featureTitle}>Ingesta de documentos</h3>
@@ -173,7 +193,7 @@ export default function HomePage() {
         </section>
 
         {/* ── Dashboard ───────────────────────────────────────────────────── */}
-        <section id="dashboard" className={styles.dashboardSection}>
+        <section id="dashboard" className={`${styles.dashboardSection} ${styles.reveal}`} style={{ transitionDelay: "100ms" }}>
           <div className={styles.dashboardHeader}>
             <div className={styles.dashboardTitleGroup}>
               <span className={styles.dashboardTitle}>Tus asistentes</span>
@@ -274,6 +294,15 @@ function AssistantCard({
   onClick: () => void;
   onDeleteRequest: () => void;
 }) {
+  const [avatar, setAvatar] = useState(assistant.name.charAt(0).toUpperCase());
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(`avatar_${assistant.id}`);
+      if (stored) setAvatar(stored);
+    }
+  }, [assistant.id]);
+
   return (
     <div
       className={`card ${styles.assistantCard} anim-fadeinup`}
@@ -285,7 +314,7 @@ function AssistantCard({
     >
       <div className={styles.cardTop}>
         <div className={styles.avatar}>
-          {assistant.name.charAt(0).toUpperCase()}
+          {avatar}
         </div>
         <button
           className={`btn btn-icon btn-danger btn-sm ${styles.deleteBtn}`}

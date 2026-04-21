@@ -216,3 +216,18 @@ def send_message(
             yield "data: [ERROR]\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+def delete_conversation(
+    conversation_id: Annotated[uuid.UUID, Path()],
+    db: DbDep,
+) -> None:
+    """Delete a conversation and all its messages."""
+    # Delete messages first (if cascade is not enabled)
+    db.table("messages").delete().eq("conversation_id", str(conversation_id)).execute()
+    result = db.table("conversations").delete().eq("id", str(conversation_id)).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    logger.info("Conversation deleted id={}", conversation_id)
+

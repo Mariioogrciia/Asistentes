@@ -1,351 +1,442 @@
 /* ── Layout ──────────────────────────────────────────────────────────────────── */
 .layout {
-  display: flex;
+  position: relative;
+  width: 100vw;
   height: 100dvh;
   overflow: hidden;
-}
-
-/* ── Sidebar ─────────────────────────────────────────────────────────────────── */
-.sidebar {
-  width: 300px;
-  flex-shrink: 0;
-  border-right: 1px solid rgba(255,255,255,0.04);
-  background: linear-gradient(180deg, var(--bg-surface), #0b0b14);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  box-shadow: 4px 0 24px rgba(0,0,0,0.2);
-  z-index: 20;
-}
-
-.sidebarHeader {
-  padding: 1rem;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.assistantInfo {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-.sidebarAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-dim);
-  color: var(--accent);
-  font-size: 1rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.sidebarName {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* ── Tabs ────────────────────────────────────────────────────────────────────── */
-.tabs {
-  display: flex;
-  padding: 0.5rem;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-}
-.tab {
-  flex: 1;
-  padding: 0.45rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
-  font-weight: 500;
+  background: var(--bg-base);
   font-family: var(--font);
-  border: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  background: transparent;
-  transition: all var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-.tabActive { background: var(--accent-dim) !important; color: var(--accent) !important; }
-.tabBadge {
-  background: var(--accent);
-  color: #fff;
-  border-radius: 99px;
-  padding: 1px 6px;
-  font-size: 0.6875rem;
 }
 
-/* ── Conversation list ───────────────────────────────────────────────────────── */
-.convList {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-}
-.convItem {
-  width: 100%;
-  text-align: left;
-  padding: 0.625rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition: all var(--transition);
-  font-family: var(--font);
-  margin-bottom: 2px;
-}
-.convItem:hover { background: var(--bg-hover); }
-.convItemActive {
-  background: var(--accent-dim) !important;
-  border-color: rgba(124, 92, 252, 0.2) !important;
-}
-.convTitle {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── Documents panel ─────────────────────────────────────────────────────────── */
-.docsPanel {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.uploadZone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 1.25rem;
-  border: 2px dashed var(--border-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all var(--transition);
-  text-align: center;
-}
-.uploadZone:hover {
-  border-color: var(--accent);
-  background: var(--accent-dim);
-}
-.uploadZoneUploading {
+/* ── Animated Ambient Background ─────────────────────────────────────────────── */
+.ambientBg {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 0;
   pointer-events: none;
-  opacity: 0.7;
+  background-image: 
+    radial-gradient(circle at 15% 50%, var(--accent-glow), transparent 30%),
+    radial-gradient(circle at 85% 30%, var(--accent-dim), transparent 30%);
+  animation: bgFloat 15s ease-in-out infinite alternate;
 }
-.uploadIcon { font-size: 1.5rem; }
-.uploadText { font-size: 0.875rem; font-weight: 500; color: var(--text-primary); }
-.docList { display: flex; flex-direction: column; gap: 4px; }
-.docItem {
+@keyframes bgFloat {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.1) translate(-2%, 2%); }
+}
+
+/* ── Top Floating Navbar (The "Dynamic Island") ──────────────────────────────── */
+.topNav {
+  position: absolute;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  background: color-mix(in srgb, var(--bg-surface) 75%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  box-shadow: var(--shadow-sm);
+  width: max-content;
+  max-width: 90vw;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.navLeft, .navRight {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.625rem;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
 }
-.docIcon { font-size: 1.1rem; flex-shrink: 0; }
-.docInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.docName { font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); }
-.docMeta { display: flex; align-items: center; gap: 6px; }
+.navAssistant {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-left: 0.5rem;
+}
+.navAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.navName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.navStatus {
+  font-size: 0.65rem;
+  color: var(--success);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.navActive {
+  background: var(--bg-hover) !important;
+  color: var(--accent) !important;
+}
+.navText {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-left: 4px;
+}
 
-/* ── Chat area ───────────────────────────────────────────────────────────────── */
-.chatArea {
+/* ── Drawers (History & Docs) ────────────────────────────────────────────────── */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.drawer {
+  width: 360px;
+  max-width: 90vw;
+  background: color-mix(in srgb, var(--bg-elevated) 85%, transparent);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  animation: slideRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes slideRight {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.drawerHeader {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.drawerTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ── Main Chat Canvas ────────────────────────────────────────────────────────── */
+.chatCanvas {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 5rem; /* space for absolute navbar */
+  height: 100vh;
+  overflow: hidden;
+}
+.chatPanel {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: radial-gradient(circle at top right, rgba(124, 92, 252, 0.08), transparent 50%),
-              radial-gradient(circle at bottom left, rgba(124, 92, 252, 0.04), transparent 50%),
-              var(--bg-base);
-  position: relative;
-}
-.chatPanel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
 }
 .chatHeader {
-  padding: 1.25rem 2rem;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  background: rgba(14, 14, 26, 0.45);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  z-index: 10;
+  display: none; /* Removed in favor of HUD dynamic island */
 }
-.chatHeader h3 { color: var(--text-primary); font-size: 1.125rem; font-weight: 600; letter-spacing: -0.01em; }
+.emptyCanvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.5rem;
+}
+.emptyCanvasIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 20px var(--accent-glow));
+}
+.emptyCanvas h2 {
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
 
-/* ── Messages ────────────────────────────────────────────────────────────────── */
+/* ── Messages Container ──────────────────────────────────────────────────────── */
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem 2rem;
+  padding: 2rem 5vw;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
   scroll-behavior: smooth;
 }
-.bubble {
+
+/* ── Node Stream (The new "Bubbles") ─────────────────────────────────────────── */
+.nodeGroup {
   display: flex;
-  gap: 1rem;
-  max-width: 85%;
-  flex-shrink: 0;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
 }
-.bubbleUser { align-self: flex-end; flex-direction: row-reverse; }
-.bubbleAssistant { align-self: flex-start; }
-.bubbleAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+.nodeUser {
+  justify-content: flex-end;
+}
+.nodeAssistant {
+  justify-content: flex-start;
+}
+
+/* Line connecting AI nodes */
+.nodeAvatarCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+.nodeAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--bg-surface), var(--bg-hover));
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1rem;
   flex-shrink: 0;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  z-index: 2;
 }
-.bubbleAssistant .bubbleAvatar {
-  background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
-  color: var(--accent);
-  border: 1px solid rgba(124, 92, 252, 0.3);
-  box-shadow: 0 0 15px rgba(124, 92, 252, 0.15);
+.nodeLine {
+  flex: 1;
+  width: 1px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent);
+  min-height: 20px;
 }
-.bubbleContent { display: flex; flex-direction: column; gap: 0.5rem; }
-.bubbleText {
-  padding: 1rem 1.25rem;
-  border-radius: 18px;
-  font-size: 0.95rem;
-  line-height: 1.6;
+
+/* Content Pane */
+.nodeContentPane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.nodeUserLabel {
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+.nodeContent {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
 }
-.bubbleUser .bubbleText {
-  background: linear-gradient(135deg, var(--accent), #5a3bc2);
-  color: #fff;
-  border-bottom-right-radius: 4px;
-  box-shadow: 0 4px 15px rgba(124, 92, 252, 0.2);
-}
-.bubbleAssistant .bubbleText {
-  background: rgba(20, 20, 34, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.06);
-  color: var(--text-primary);
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-}
-
-/* ── Sources ─────────────────────────────────────────────────────────────────── */
-.sources {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-left: 0.25rem;
-}
-.sourceItem {
+.nodeUser .nodeContent {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.625rem 0.75rem;
-  animation: fadeInUp 200ms ease;
+  padding: 1rem 1.5rem;
+  border-radius: 20px;
+  border-top-right-radius: 4px;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+  display: inline-block;
+  align-self: flex-end;
+  max-width: 90%;
 }
-.sourceScore {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--success);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
+.nodeAssistant .nodeContent {
+  color: var(--text-primary);
+  padding-top: 0.35rem; /* align with avatar */
+  letter-spacing: -0.01em;
 }
-.sourceText { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; }
 
-/* ── Input area ──────────────────────────────────────────────────────────────── */
+/* Node Sources */
+.nodeSources {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.sourceToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent);
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  width: fit-content;
+}
+.sourceToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.sourceNodeItem {
+  background: var(--bg-elevated);
+  border-left: 2px solid var(--accent);
+  padding: 0.75rem 1rem;
+  border-radius: 0 8px 8px 0;
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+.sourceScore {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+.sourceText {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ── Glowing Chat Input ──────────────────────────────────────────────────────── */
 .inputArea {
-  padding: 1.5rem;
-  background: transparent;
+  padding: 1.5rem 5vw 2.5rem;
+  background: linear-gradient(to top, var(--bg-base) 60%, transparent);
+  position: relative;
+  z-index: 20;
   display: flex;
   justify-content: center;
-  position: relative;
-  z-index: 10;
 }
 .inputContainer {
   display: flex;
   gap: 0.75rem;
   align-items: flex-end;
-  max-width: 850px;
+  max-width: 800px;
   width: 100%;
-  background: rgba(20, 20, 34, 0.65);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: color-mix(in srgb, var(--bg-surface) 80%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
   border-radius: 24px;
-  padding: 0.5rem 0.5rem 0.5rem 1rem;
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.02) inset;
-  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+  padding: 0.625rem 0.875rem 0.625rem 1.5rem;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .inputContainer:focus-within {
-  border-color: rgba(124, 92, 252, 0.4);
-  box-shadow: var(--shadow-lg), 0 0 24px rgba(124, 92, 252, 0.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-dim), var(--shadow-lg);
   transform: translateY(-2px);
+  background: var(--bg-elevated);
 }
 .chatInput {
   flex: 1;
-  min-height: 44px;
-  padding: 0.5rem;
-  border-radius: 0;
-  background: transparent !important;
+  background: transparent;
   border: none;
-  font-size: 0.95rem;
-  line-height: 1.5;
   color: var(--text-primary);
-  box-shadow: none !important;
+  font-size: 1rem;
+  padding: 0.25rem 0;
   outline: none;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
 }
-.chatInput:focus { box-shadow: none !important; }
+.chatInput::placeholder { color: var(--text-muted); }
 .sendBtn {
-  width: 44px;
-  height: 44px;
-  padding: 0;
   border-radius: 50%;
-  font-size: 1.25rem;
-  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent);
-  color: #fff;
-  transition: all 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+  background: var(--text-primary);
+  color: var(--bg-base);
   border: none;
+  transition: transform 0.2s;
+}
+.sendBtn:not(:disabled):hover {
+  transform: scale(1.1);
+  background: var(--accent);
+  color: white;
+}
+.sendBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Misc ────────────────────────────────────────────────────────────────────── */
+.glowingBtn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 99px;
+  font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 0 20px var(--accent-glow);
+  transition: all 0.2s;
 }
-.sendBtn:hover:not(:disabled) {
-  transform: scale(1.08);
-  box-shadow: 0 4px 16px var(--accent-glow);
-  background: var(--accent-hover);
+.glowingBtn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px var(--accent-glow);
 }
-.sendBtn:disabled {
-  background: var(--bg-hover);
-  color: var(--text-muted);
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+
+.convList { display: flex; flex-direction: column; padding: 1rem; overflow-y: auto; flex: 1; }
+.convItemWrapper { position: relative; margin-bottom: 2px; display: flex; align-items: center; }
+.convItemWrapper:hover .convDeleteBtn { opacity: 1; }
+.convItem {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start;
+  padding: 0.75rem 1rem; padding-right: 2rem; border-radius: 12px;
+  border: 1px solid transparent; background: transparent; color: inherit;
+  text-align: left; cursor: pointer; transition: all 0.2s;
 }
+.convItem:hover { background: var(--bg-hover); }
+.convItemActive { background: var(--accent-dim) !important; border-color: var(--accent-mid) !important; }
+.convTitle { font-weight: 500; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.convDeleteBtn {
+  position: absolute; right: 0.5rem; opacity: 0; width: 24px; height: 24px;
+  border-radius: 50%; border: none; background: var(--bg-elevated); box-shadow: var(--shadow-sm);
+  color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; z-index: 10;
+}
+.convDeleteBtn:hover { background: var(--error); color: white; transform: scale(1.1); }
+
+.docsPanel { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
+.uploadZone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 2rem; border: 2px dashed var(--border-strong); border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent); cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.uploadZone:hover { border-color: var(--accent); background: var(--accent-dim); }
+.uploadIcon { font-size: 2rem; }
+.uploadText { font-size: 0.9rem; font-weight: 500; color: var(--text-primary); }
+.docList { display: flex; flex-direction: column; gap: 8px; }
+.docItem {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem;
+  border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border);
+}
+.docIcon { font-size: 1.2rem; }
+.docInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.docName { font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.docMeta { display: flex; align-items: center; gap: 6px; }

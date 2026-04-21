@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, type Assistant, type Conversation, type Document, type Message } from "@/lib/api";
 import styles from "./page.module.css";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { GalaxyBackground } from "@/components/GalaxyBackground";
 
 export default function AssistantPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +19,16 @@ export default function AssistantPage() {
   const [tab, setTab] = useState<"chat" | "docs">("chat");
   const [loading, setLoading] = useState(true);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
+  const [convToDelete, setConvToDelete] = useState<Conversation | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [avatar, setAvatar] = useState("✦");
+  const [drawer, setDrawer] = useState<"none" | "history" | "docs">("none");
+
+  useEffect(() => {
+    if (id && typeof window !== "undefined") {
+      setAvatar(localStorage.getItem(`avatar_${id}`) || "✦");
+    }
+  }, [id]);
 
   useEffect(() => {
     Promise.all([
@@ -53,68 +65,67 @@ export default function AssistantPage() {
 
   return (
     <div className={styles.layout}>
-      {/* Sidebar */}
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>
-          <button className="btn btn-ghost btn-sm" onClick={() => router.push("/")} title="Volver">
-            ← Volver
+      {/* Dynamic Ambient Background */}
+      <div className={styles.ambientBg} />
+
+      {/* Top Floating Navbar (The "Dynamic Island") */}
+      <header className={styles.topNav}>
+        <div className={styles.navLeft}>
+          <button className="btn btn-icon btn-ghost" onClick={() => router.push("/")} title="Volver al Inicio">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
-          <div className={styles.assistantInfo}>
-            <div className={styles.sidebarAvatar}>{assistant.name.charAt(0).toUpperCase()}</div>
-            <div>
-              <div className={styles.sidebarName}>{assistant.name}</div>
-              {assistant.description && <div className="text-xs text-muted truncate">{assistant.description}</div>}
+          <div className={styles.navAssistant}>
+            <div className={styles.navAvatar}>{avatar}</div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className={styles.navName}>{assistant.name}</span>
+              <span className={styles.navStatus}>Online</span>
             </div>
           </div>
         </div>
-
-        {/* Tabs */}
-        <div className={styles.tabs}>
-          <button className={`${styles.tab} ${tab === "chat" ? styles.tabActive : ""}`} onClick={() => setTab("chat")}>
-            💬 Chat
+        
+        <div className={styles.navRight}>
+          <button className={`btn btn-ghost ${drawer === "history" ? styles.navActive : ""}`} onClick={() => setDrawer(d => d === "history" ? "none" : "history")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span className={styles.navText}>Historial</span>
           </button>
-          <button className={`${styles.tab} ${tab === "docs" ? styles.tabActive : ""}`} onClick={() => setTab("docs")}>
-            📄 Docs {documents.length > 0 && <span className={styles.tabBadge}>{documents.length}</span>}
+          <button className={`btn btn-ghost ${drawer === "docs" ? styles.navActive : ""}`} onClick={() => setDrawer(d => d === "docs" ? "none" : "docs")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span className={styles.navText}>Docs ({documents.length})</span>
           </button>
+          <button className="btn btn-icon btn-ghost" onClick={() => setShowSettings(true)} title="Ajustes">
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
+          <div style={{ marginLeft: "0.5rem" }}><ThemeToggle /></div>
         </div>
+      </header>
 
-        {/* Sidebar content */}
-        {tab === "chat" ? (
-          <ConversationList
-            conversations={conversations}
-            active={activeConv}
-            onSelect={handleSelectConv}
-            onNew={handleNewConversation}
-          />
-        ) : (
-          <DocumentsPanel
-            assistantId={id}
-            documents={documents}
-            onChange={setDocuments}
-            onDeleteRequest={setDocToDelete}
-          />
-        )}
-      </aside>
+      {/* Floating Drawers overlay */}
+      {drawer !== "none" && (
+        <div className={styles.drawerOverlay} onClick={() => setDrawer("none")}>
+          <div className={`${styles.drawer} ${styles.reveal}`} onClick={e => e.stopPropagation()}>
+            <div className={styles.drawerHeader}>
+              <h3 className={styles.drawerTitle}>{drawer === "history" ? "Historial de Chat" : "Base de Conocimiento"}</h3>
+              <button className="btn btn-icon btn-ghost" onClick={() => setDrawer("none")}>✕</button>
+            </div>
+            {drawer === "history" ? (
+              <ConversationList conversations={conversations} active={activeConv} onSelect={(c) => { handleSelectConv(c); setDrawer("none"); }} onNew={() => { handleNewConversation(); setDrawer("none"); }} onDelete={(c) => setConvToDelete(c)} />
+            ) : (
+              <DocumentsPanel assistantId={id} documents={documents} onChange={setDocuments} onDeleteRequest={setDocToDelete} />
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* Main chat area */}
-      <main className={styles.chatArea}>
+      {/* Main Chat Canvas */}
+      <main className={styles.chatCanvas}>
         {activeConv ? (
-          <ChatPanel
-            conversation={activeConv}
-            messages={messages}
-            onNewMessage={(msg) => setMessages(prev => [...prev, msg])}
-            onUpdateLastMessage={(content) =>
-              setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content } : m))
-            }
-          />
+          <ChatPanel conversation={activeConv} messages={messages} onNewMessage={(msg) => setMessages(prev => [...prev, msg])} onUpdateLastMessage={(content) => setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content } : m))} />
         ) : (
-          <div className="empty" style={{ flex: 1 }}>
-            <div className="empty-icon">💬</div>
-            <h3>Sin conversación activa</h3>
-            <p>Crea una nueva conversación para empezar a chatear.</p>
-            <button className="btn btn-primary" style={{ marginTop: "1rem" }} onClick={handleNewConversation}>
-              Nueva conversación
-            </button>
+          <div className={styles.emptyCanvas}>
+            <div className={styles.emptyCanvasIcon}>✨</div>
+            <h2>Lienzo en blanco</h2>
+            <p className="text-muted">Inicia una nueva exploración con {assistant.name}</p>
+            <button className={`${styles.glowingBtn} mt-6`} onClick={handleNewConversation}>Comenzar</button>
           </div>
         )}
       </main>
@@ -136,18 +147,56 @@ export default function AssistantPage() {
           }}
         />
       )}
+
+      {/* Conversation Delete Confirmation Modal */}
+      {convToDelete && (
+        <DeleteConversationModal
+          conversation={convToDelete}
+          onClose={() => setConvToDelete(null)}
+          onConfirm={async () => {
+            const cId = convToDelete.id;
+            setConvToDelete(null);
+            try {
+              await api.conversations.delete(cId);
+              setConversations(prev => prev.filter(c => c.id !== cId));
+              if (activeConv?.id === cId) {
+                setActiveConv(null);
+                setMessages([]);
+              }
+            } catch (err) {
+              alert("Error al eliminar la conversación.");
+            }
+          }}
+        />
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <EditAssistantModal
+          assistant={assistant}
+          avatar={avatar}
+          onClose={() => setShowSettings(false)}
+          onUpdated={(updatedAsst, updatedAvatar) => {
+            setAssistant(updatedAsst);
+            setAvatar(updatedAvatar);
+            localStorage.setItem(`avatar_${id}`, updatedAvatar);
+            setShowSettings(false);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // ── ConversationList ───────────────────────────────────────────────────────────
 function ConversationList({
-  conversations, active, onSelect, onNew,
+  conversations, active, onSelect, onNew, onDelete
 }: {
   conversations: Conversation[];
   active: Conversation | null;
   onSelect: (c: Conversation) => void;
   onNew: () => void;
+  onDelete: (c: Conversation) => void;
 }) {
   return (
     <div className={styles.convList}>
@@ -157,16 +206,24 @@ function ConversationList({
       {conversations.length === 0 ? (
         <p className="text-sm text-muted" style={{ padding: "0.5rem" }}>Sin conversaciones</p>
       ) : conversations.map(c => (
-        <button
-          key={c.id}
-          className={`${styles.convItem} ${active?.id === c.id ? styles.convItemActive : ""}`}
-          onClick={() => onSelect(c)}
-        >
-          <span className={styles.convTitle}>{c.title || "Nueva conversación"}</span>
-          <span className="text-xs text-muted">
-            {new Date(c.updated_at).toLocaleDateString("es-ES")}
-          </span>
-        </button>
+        <div key={c.id} className={styles.convItemWrapper}>
+          <button
+            className={`${styles.convItem} ${active?.id === c.id ? styles.convItemActive : ""}`}
+            onClick={() => onSelect(c)}
+          >
+            <span className={styles.convTitle}>{c.title || "Nueva conversación"}</span>
+            <span className="text-xs text-muted">
+              {new Date(c.updated_at).toLocaleDateString("es-ES")}
+            </span>
+          </button>
+          <button
+            className={styles.convDeleteBtn}
+            onClick={(e) => { e.stopPropagation(); onDelete(c); }}
+            title="Eliminar conversación"
+          >
+            ✕
+          </button>
+        </div>
       ))}
     </div>
   );
@@ -267,7 +324,7 @@ function ChatPanel({
           </div>
         )}
         {messages.map((msg, i) => (
-          <MessageBubble key={msg.id} message={msg} isLastStreaming={streaming && i === messages.length - 1} />
+          <MessageBubble key={msg.id} message={msg} isLastStreaming={streaming && i === messages.length - 1} assistantAvatar={localStorage.getItem(`avatar_${conversation.assistant_id}`) || "✦"} />
         ))}
         <div ref={bottomRef} />
       </div>
@@ -299,39 +356,43 @@ function ChatPanel({
   );
 }
 
-// ── MessageBubble ──────────────────────────────────────────────────────────────
-function MessageBubble({ message, isLastStreaming }: { message: Message; isLastStreaming: boolean }) {
+// ── Node Stream (No classic bubbles) ──────────────────────────────────────────
+function MessageBubble({ message, isLastStreaming, assistantAvatar }: { message: Message; isLastStreaming: boolean; assistantAvatar: string }) {
   const isUser = message.role === "user";
   const [showSources, setShowSources] = useState(false);
 
   return (
-    <div className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant} anim-fadeinup`}>
-      <div className={styles.bubbleAvatar}>{isUser ? "👤" : "✦"}</div>
-      <div className={styles.bubbleContent}>
+    <div className={`${styles.nodeGroup} ${isUser ? styles.nodeUser : styles.nodeAssistant}`}>
+      {!isUser && (
+        <div className={styles.nodeAvatarCol}>
+          <div className={styles.nodeAvatar}>{assistantAvatar}</div>
+          <div className={styles.nodeLine} />
+        </div>
+      )}
+      <div className={styles.nodeContentPane}>
+        {isUser && <div className={styles.nodeUserLabel}>Tú</div>}
         {isLastStreaming && message.content === "" ? (
           <div className="dot-pulse"><span /><span /><span /></div>
         ) : (
-          <div className={styles.bubbleText}>
+          <div className={styles.nodeContent}>
             {message.content.split("\n").map((line, i) => (
-              <span key={i}>{line}<br /></span>
+              <span key={i} style={{ display: 'block', minHeight: line.trim() ? "auto" : "1em" }}>{line}</span>
             ))}
           </div>
         )}
         {message.sources.length > 0 && (
-          <div className={styles.sources}>
+          <div className={styles.nodeSources}>
             <button
-              className="btn btn-ghost btn-sm"
-              style={{ fontSize: "0.75rem" }}
+              className={styles.sourceToggle}
               onClick={() => setShowSources(!showSources)}
             >
-              📎 {message.sources.length} fuente{message.sources.length > 1 ? "s" : ""}
-              {showSources ? " ▲" : " ▼"}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <span>Fuentes ({message.sources.length})</span>
+              {showSources ? "▲" : "▼"}
             </button>
             {showSources && message.sources.map((s, i) => (
-              <div key={i} className={styles.sourceItem}>
-                <div className={styles.sourceScore}>
-                  {Math.round(s.similarity * 100)}% relevante
-                </div>
+              <div key={i} className={styles.sourceNodeItem}>
+                <div className={styles.sourceScore}>Ref: {Math.round(s.similarity * 100)}%</div>
                 <p className={styles.sourceText}>{s.content.slice(0, 200)}…</p>
               </div>
             ))}
@@ -461,6 +522,121 @@ function DeleteConfirmModal({
             Eliminar definitivamente
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteConversationModal({
+  conversation, onClose, onConfirm,
+}: {
+  conversation: Conversation;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "400px" }}>
+        <div className="modal-header">
+          <h2 style={{ color: "var(--error)" }}>¿Eliminar conversación?</h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose}>✕</button>
+        </div>
+        <div style={{ marginBottom: "1.5rem" }}>
+          <p className="text-sm">
+            Estás a punto de eliminar <strong>{conversation.title || "esta conversación"}</strong>.
+          </p>
+          <p className="text-sm" style={{ marginTop: "0.5rem", color: "var(--text-muted)" }}>
+            Se borrarán todos los mensajes de forma permanente en la base de datos.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-danger" onClick={onConfirm}>
+            Eliminar definitivamente
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditAssistantModal({
+  assistant, avatar, onClose, onUpdated
+}: {
+  assistant: Assistant;
+  avatar: string;
+  onClose: () => void;
+  onUpdated: (asst: Assistant, avatar: string) => void;
+}) {
+  const [name, setName] = useState(assistant.name);
+  const [desc, setDesc] = useState(assistant.description || "");
+  const [inst, setInst] = useState(assistant.instructions);
+  const [localAvatar, setLocalAvatar] = useState(avatar);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const updated = await api.assistants.update(assistant.id, {
+        name,
+        description: desc,
+        instructions: inst
+      });
+      onUpdated(updated, localAvatar);
+    } catch (err) {
+      alert("Error al actualizar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const PRESET_AVATARS = ["✦", "🤖", "🧠", "✨", "🚀", "💡", "🔮", "👽", "🦉", "⚖️", "💼", "📚"];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "500px" }}>
+        <div className="modal-header">
+          <h2>Ajustes del Asistente</h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={handleSave}>
+          <div style={{ marginBottom: "1.5rem" }}>
+            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>Avatar</label>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+              {PRESET_AVATARS.map(a => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setLocalAvatar(a)}
+                  style={{
+                    width: "40px", height: "40px", borderRadius: "50%",
+                    fontSize: "1.5rem", background: localAvatar === a ? "var(--bg-active)" : "var(--bg-surface)",
+                    border: localAvatar === a ? "2px solid var(--accent)" : "1px solid var(--border)",
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
+                  }}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+
+            <label className="label">Nombre</label>
+            <input required className="input" value={name} onChange={e => setName(e.target.value)} />
+            
+            <label className="label" style={{ marginTop: "1rem" }}>Descripción corta</label>
+            <input className="input" value={desc} onChange={e => setDesc(e.target.value)} />
+
+            <label className="label" style={{ marginTop: "1rem" }}>Instrucciones del Sistema</label>
+            <textarea required className="input" rows={4} value={inst} onChange={e => setInst(e.target.value)} style={{ resize: "vertical" }} />
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Guardando..." : "Guardar Cambios"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

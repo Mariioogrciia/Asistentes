@@ -54,7 +54,37 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --transition: 160ms var(--ease);
 
+  --galaxy-bg: radial-gradient(ellipse at top, rgba(30,20,50,0.5) 0%, transparent 100%);
   --font: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+[data-theme="light"] {
+  --bg-base:     #ffffff;
+  --bg-surface:  #f9fafb;
+  --bg-elevated: #ffffff;
+  --bg-hover:    #f3f4f6;
+  --bg-active:   #e5e7eb;
+
+  --border:        rgba(0, 0, 0, 0.06);
+  --border-mid:    rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+
+  --text-primary:   #111827;
+  --text-secondary: #4b5563;
+  --text-muted:     #9ca3af;
+  --text-accent:    #6d28d9;
+
+  --accent:       #7c5cfc;
+  --accent-dim:   rgba(124, 92, 252, 0.06);
+  --accent-mid:   rgba(124, 92, 252, 0.10);
+  --accent-glow:  rgba(124, 92, 252, 0.15);
+  --accent-hover: #6d28d9;
+  
+  --galaxy-bg: radial-gradient(ellipse at top, rgba(124, 92, 252, 0.08) 0%, transparent 100%);
+
+  --shadow-sm:   0 1px 2px rgba(0,0,0,0.05);
+  --shadow:      0 4px 20px rgba(0,0,0,0.03);
+  --shadow-lg:   0 12px 40px rgba(0,0,0,0.05);
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */

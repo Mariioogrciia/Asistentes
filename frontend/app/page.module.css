@@ -3,6 +3,8 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
 
 /* ── Navbar ──────────────────────────────────────────────────────────────────── */
@@ -11,7 +13,8 @@
   top: 0;
   z-index: 50;
   border-bottom: 1px solid var(--border);
-  background: rgba(8, 8, 16, 0.85);
+  background: var(--bg-base);
+  opacity: 0.95;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
@@ -58,23 +61,38 @@
 
 /* ── Hero ───────────────────────────────────────────────────────────────────── */
 .hero {
-  padding: 7rem 0 5rem;
-  max-width: 680px;
+  padding: 8rem 0 6rem;
+  max-width: 760px;
   margin: 0 auto;
   text-align: center;
   position: relative;
+  z-index: 2;
 }
 
-/* Subtle radial "glow" behind the hero — only hue, no blur blob */
-.hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(124, 92, 252, 0.10) 0%, transparent 70%);
-  pointer-events: none;
+/* ── Reveal & Animations ─────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
+.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* ── Background (Now handled by GalaxyBackground Canvas) ── */
+
+/* Eliminar el radial gradient viejo porque ahora usamos orbes dedicados */
 
 .heroBadge {
   display: inline-flex;
@@ -100,15 +118,23 @@
 }
 
 .heroTitle {
-  font-size: clamp(2.25rem, 5.5vw, 3.5rem);
-  line-height: 1.08;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  line-height: 1.05;
   font-weight: 800;
   letter-spacing: -0.04em;
   color: var(--text-primary);
   margin-bottom: 1.5rem;
+  background: linear-gradient(180deg, var(--text-primary) 20%, var(--text-muted) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.1);
 }
 .heroTitleAccent {
-  color: var(--text-accent);
+  background: linear-gradient(135deg, #a48dff 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+  padding-right: 4px;
 }
 
 .heroSubtitle {
@@ -160,25 +186,29 @@
 
 .featureCard {
   background: var(--bg-surface);
-  padding: 2rem 1.875rem;
+  padding: 2.25rem 2rem;
   display: flex;
   flex-direction: column;
   gap: 0;
-  transition: background var(--transition);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
+  border: 1px solid var(--border);
 }
 .featureCard::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent-mid), transparent);
+  inset: 0;
+  background: radial-gradient(400px circle at top center, var(--accent-glow), transparent);
   opacity: 0;
-  transition: opacity var(--transition);
+  transition: opacity 0.5s ease;
+  pointer-events: none;
 }
 .featureCard:hover {
   background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
 }
 .featureCard:hover::before {
   opacity: 1;

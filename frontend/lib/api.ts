@@ -118,5 +118,8 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       }),
+    delete: (conversationId: string) =>
+      fetch(`${API_BASE}/conversations/${conversationId}`, { method: "DELETE" })
+        .then(r => { if (!r.ok) throw new Error("Error al eliminar la conversación"); }),
   },
 };
