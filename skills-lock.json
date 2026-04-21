@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "fastapi": {
+      "source": "fastapi/fastapi",
+      "sourceType": "github",
+      "computedHash": "9feb517089c269af4fdab5031dea1100a92fd50081e906ccfaf8a971858e39f9"
+    },
+    "python-best-practices": {
+      "source": "0xbigboss/claude-code",
+      "sourceType": "github",
+      "computedHash": "9096f9ba1660f3dc864206f05f2851f77a3872dded644514a63a509d5052466d"
+    },
+    "python-logging-best-practices": {
+      "source": "terrylica/cc-skills",
+      "sourceType": "github",
+      "computedHash": "2725956560c6c670d930bcb64a92028ba091d6df47b480d65442009142185b15"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "computedHash": "8e41c7417894e6f394614ee7ca3ee5322b1e58d890255d441f42dea98732597f"
+    }
+  }
+}
