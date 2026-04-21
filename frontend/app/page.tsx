@@ -11,6 +11,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assistantToDelete, setAssistantToDelete] = useState<Assistant | null>(null);
 
   useEffect(() => {
     api.assistants.list()
@@ -39,10 +40,58 @@ export default function HomePage() {
 
       {/* Content */}
       <div className={styles.content}>
-        <div className={styles.hero}>
-          <h1>Tus asistentes IA</h1>
-          <p>Crea asistentes con sus propios documentos y chatea con ellos.</p>
-        </div>
+        {/* Landing Hero */}
+        <section className={styles.landingHero}>
+          <div className={styles.landingBadge}>V2.0 Ya Disponible ✨</div>
+          <h1 className={styles.landingTitle}>
+            Dale superpoderes a tus <span>documentos</span>
+          </h1>
+          <p className={styles.landingSubtitle}>
+            Crea asistentes de Inteligencia Artificial personalizados. Sube tus PDFs, Word o TXT y chatea con ellos al instante usando tecnología RAG avanzada.
+          </p>
+          <div className={styles.heroActions}>
+            <button 
+              className="btn btn-primary btn-lg" 
+              onClick={() => {
+                if (assistants.length === 0) setShowModal(true);
+                else document.getElementById("dashboard")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              Comenzar ahora
+            </button>
+            <a href="https://github.com/Mariioogrciia/Asistentes" target="_blank" rel="noreferrer" className="btn btn-ghost btn-lg">
+              Ver GitHub
+            </a>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className={styles.featuresGrid}>
+          <div className={styles.featureCard}>
+            <div className={styles.featureIcon}>📁</div>
+            <h3 className={styles.featureTitle}>Sube tus Archivos</h3>
+            <p className={styles.featureDesc}>PDFs, Docs, PPTX o Markdown. Tu conocimiento centralizado.</p>
+          </div>
+          <div className={styles.featureCard}>
+            <div className={styles.featureIcon}>⚡</div>
+            <h3 className={styles.featureTitle}>Búsqueda Vectorial</h3>
+            <p className={styles.featureDesc}>Motor RAG ultra-rápido para encontrar respuestas precisas en milisegundos.</p>
+          </div>
+          <div className={styles.featureCard}>
+            <div className={styles.featureIcon}>💬</div>
+            <h3 className={styles.featureTitle}>Chat en Tiempo Real</h3>
+            <p className={styles.featureDesc}>Conversa fluidamente con modelos de IA viendo cómo se genera el texto palabra a palabra.</p>
+          </div>
+        </section>
+
+        {/* Dashboard Section */}
+        <section id="dashboard" className={styles.dashboardSection}>
+          <div className={styles.dashboardHeader}>
+            <h2>Tus asistentes IA</h2>
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              + Nuevo asistente
+            </button>
+          </div>
 
         {loading ? (
           <div className={styles.loadingGrid}>
@@ -70,12 +119,13 @@ export default function HomePage() {
                 key={a.id}
                 assistant={a}
                 style={{ animationDelay: `${i * 50}ms` }}
-                onDelete={() => setAssistants(prev => prev.filter(x => x.id !== a.id))}
                 onClick={() => router.push(`/assistants/${a.id}`)}
+                onDeleteRequest={() => setAssistantToDelete(a)}
               />
             ))}
           </div>
         )}
+        </section>
       </div>
 
       {/* Create Modal */}
@@ -89,6 +139,23 @@ export default function HomePage() {
           }}
         />
       )}
+      {/* Delete Confirmation Modal */}
+      {assistantToDelete && (
+        <DeleteAssistantModal
+          assistant={assistantToDelete}
+          onClose={() => setAssistantToDelete(null)}
+          onConfirm={async () => {
+            const id = assistantToDelete.id;
+            setAssistantToDelete(null);
+            try {
+              await api.assistants.delete(id);
+              setAssistants(prev => prev.filter(x => x.id !== id));
+            } catch (err) {
+              alert("Error al eliminar el asistente.");
+            }
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -99,21 +166,18 @@ function AssistantCard({
   assistant,
   style,
   onClick,
-  onDelete,
+  onDeleteRequest,
 }: {
   assistant: Assistant;
   style?: React.CSSProperties;
   onClick: () => void;
-  onDelete: () => void;
+  onDeleteRequest: () => void;
 }) {
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm(`¿Eliminar "${assistant.name}" y todos sus datos?`)) return;
-    setDeleting(true);
-    await api.assistants.delete(assistant.id);
-    onDelete();
+    onDeleteRequest();
   }
 
   return (
@@ -214,6 +278,49 @@ function CreateAssistantModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ── DeleteAssistantModal ───────────────────────────────────────────────────────
+
+function DeleteAssistantModal({
+  assistant, onClose, onConfirm,
+}: {
+  assistant: Assistant;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function handleConfirm() {
+    setIsDeleting(true);
+    await onConfirm();
+    setIsDeleting(false); // Only reached if error, otherwise unmounted
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "400px" }}>
+        <div className="modal-header">
+          <h2 style={{ color: "var(--error)" }}>¿Eliminar asistente?</h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose} disabled={isDeleting}>✕</button>
+        </div>
+        <div style={{ marginBottom: "1.5rem" }}>
+          <p className="text-sm">
+            Estás a punto de eliminar a <strong>{assistant.name}</strong>.
+          </p>
+          <p className="text-sm" style={{ marginTop: "0.5rem", color: "var(--text-muted)" }}>
+            Esta acción es irreversible. Se borrarán definitivamente todos sus <strong>documentos del Storage, las conversaciones y toda su configuración</strong> de la base de datos.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose} disabled={isDeleting}>Cancelar</button>
+          <button className="btn btn-danger" onClick={handleConfirm} disabled={isDeleting}>
+            {isDeleting ? <><span className="spinner" /> Eliminando...</> : "Eliminar definitivamente"}
+          </button>
+        </div>
       </div>
     </div>
   );

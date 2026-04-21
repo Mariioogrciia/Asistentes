@@ -133,6 +133,10 @@ def delete_document(
     except Exception as exc:
         logger.warning("Could not delete storage file path={} error={}", storage_path, exc)
 
-    # Delete DB record (chunks cascade automatically)
-    db.table("documents").delete().eq("id", str(document_id)).execute()
+    # 1. Delete chunks first (explicitly, in case CASCADE is not set)
+    db.table("chunks").delete().eq("document_id", str(document_id)).execute()
+
+    # 2. Delete DB record
+    db.table("documents").delete().eq("id", str(document_id)).eq("assistant_id", str(assistant_id)).execute()
+    
     logger.info("Document deleted doc_id={}", document_id)

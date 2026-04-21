@@ -16,6 +16,7 @@ export default function AssistantPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [tab, setTab] = useState<"chat" | "docs">("chat");
   const [loading, setLoading] = useState(true);
+  const [docToDelete, setDocToDelete] = useState<Document | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -90,6 +91,7 @@ export default function AssistantPage() {
             assistantId={id}
             documents={documents}
             onChange={setDocuments}
+            onDeleteRequest={setDocToDelete}
           />
         )}
       </aside>
@@ -116,6 +118,24 @@ export default function AssistantPage() {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {docToDelete && (
+        <DeleteConfirmModal
+          document={docToDelete}
+          onClose={() => setDocToDelete(null)}
+          onConfirm={async () => {
+            const docId = docToDelete.id;
+            setDocToDelete(null);
+            try {
+              await api.documents.delete(id, docId);
+              setDocuments(prev => prev.filter(d => d.id !== docId));
+            } catch (err) {
+              alert("Error al eliminar el documento.");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -322,11 +342,12 @@ function MessageBubble({ message, isLastStreaming }: { message: Message; isLastS
 
 // ── DocumentsPanel ─────────────────────────────────────────────────────────────
 function DocumentsPanel({
-  assistantId, documents, onChange,
+  assistantId, documents, onChange, onDeleteRequest,
 }: {
   assistantId: string;
   documents: Document[];
   onChange: (docs: Document[]) => void;
+  onDeleteRequest: (doc: Document) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -349,9 +370,7 @@ function DocumentsPanel({
   }
 
   async function handleDelete(doc: Document) {
-    if (!confirm(`¿Eliminar "${doc.filename}"?`)) return;
-    await api.documents.delete(assistantId, doc.id);
-    onChange(documents.filter(d => d.id !== doc.id));
+    onDeleteRequest(doc);
   }
 
   return (
@@ -408,6 +427,39 @@ function PageLoader() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100dvh" }}>
       <div className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
+    </div>
+  );
+}
+
+function DeleteConfirmModal({
+  document, onClose, onConfirm,
+}: {
+  document: Document;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "400px" }}>
+        <div className="modal-header">
+          <h2 style={{ color: "var(--error)" }}>¿Eliminar documento?</h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose}>✕</button>
+        </div>
+        <div style={{ marginBottom: "1.5rem" }}>
+          <p className="text-sm">
+            Estás a punto de eliminar <strong>{document.filename}</strong>.
+          </p>
+          <p className="text-sm" style={{ marginTop: "0.5rem", color: "var(--text-muted)" }}>
+            Esta acción es irreversible y borrará el archivo del Storage y todos sus datos de la base de datos.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-danger" onClick={onConfirm}>
+            Eliminar definitivamente
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

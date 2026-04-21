@@ -100,7 +100,30 @@ def delete_assistant(
     assistant_id: Annotated[uuid.UUID, Path()],
     db: DbDep,
 ) -> None:
-    """Delete an assistant and all its documents, chunks, and conversations (cascade)."""
+    """Delete an assistant and all its documents, chunks, and conversations."""
+    from backend.config import get_settings
+    settings = get_settings()
+
+    # 1. Fetch all documents to delete their files from Storage
+    docs = db.table("documents").select("storage_path").eq("assistant_id", str(assistant_id)).execute()
+    storage_paths = [doc["storage_path"] for doc in docs.data if doc.get("storage_path")]
+
+    if storage_paths:
+        try:
+            db.storage.from_(settings.supabase_bucket).remove(storage_paths)
+            logger.info("Deleted {} files from storage for assistant_id={}", len(storage_paths), assistant_id)
+        except Exception as exc:
+            logger.warning("Could not delete files from storage error={}", exc)
+
+    # 2. Explicitly delete related DB records (in case CASCADE is not set up)
+    db.table("chunks").delete().eq("assistant_id", str(assistant_id)).execute()
+    db.table("documents").delete().eq("assistant_id", str(assistant_id)).execute()
+    
+    # Note: Conversations and messages should cascade automatically from the assistant deletion,
+    # but we can explicitly delete conversations as well.
+    db.table("conversations").delete().eq("assistant_id", str(assistant_id)).execute()
+
+    # 3. Delete the assistant record itself
     result = db.table("assistants").delete().eq("id", str(assistant_id)).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Assistant not found")
