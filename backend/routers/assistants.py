@@ -103,40 +103,56 @@ def update_assistant(
 
 
 @router.delete("/{assistant_id}", status_code=204)
+@router.post("/{assistant_id}/delete", status_code=204)
 def delete_assistant(
     assistant_id: Annotated[uuid.UUID, Path()],
     db: DbDep,
     user: UserDep,
 ) -> None:
-    """Delete an assistant and its associated data, ensuring ownership."""
+    """Delete an assistant and its associated data, ensuring ownership or admin rights."""
     from backend.config import get_settings
     settings = get_settings()
 
-    # Verify ownership before deleting
-    query = db.table("assistants").select("id").eq("id", str(assistant_id))
-    if user.role != "admin":
-        query = query.eq("user_id", str(user.id))
+    logger.info(">>> DELETE REQUEST RECEIVED for assistant_id={} from user_id={} (role={})", assistant_id, user.id, user.role)
     
-    check = query.maybe_single().execute()
+    # 1. Verify existence and permissions
+    # We use the db client (service_role) to check the real owner
+    check = db.table("assistants").select("id, user_id").eq("id", str(assistant_id)).maybe_single().execute()
+    
     if not check.data:
-        raise HTTPException(status_code=404, detail="Assistant not found or access denied")
+        logger.warning("Assistant {} not found in database", assistant_id)
+        raise HTTPException(status_code=404, detail="Asistente no encontrado")
 
-    # 1. Fetch all documents to delete their files from Storage
-    docs = db.table("documents").select("storage_path").eq("assistant_id", str(assistant_id)).execute()
-    storage_paths = [doc["storage_path"] for doc in docs.data if doc.get("storage_path")]
+    # Access control: Owner OR Admin
+    is_owner = check.data.get("user_id") == str(user.id)
+    is_admin = user.role == "admin"
 
-    if storage_paths:
-        try:
-            db.storage.from_(settings.supabase_bucket).remove(storage_paths)
-            logger.info("Deleted {} files from storage for assistant_id={}", len(storage_paths), assistant_id)
-        except Exception as exc:
-            logger.warning("Could not delete files from storage error={}", exc)
+    if not is_owner and not is_admin:
+        logger.warning("Access denied: User {} is neither owner nor admin for assistant {}", user.id, assistant_id)
+        raise HTTPException(status_code=403, detail="No tienes permisos para borrar este asistente")
 
-    # 2. Explicitly delete related DB records
-    db.table("chunks").delete().eq("assistant_id", str(assistant_id)).execute()
-    db.table("documents").delete().eq("assistant_id", str(assistant_id)).execute()
-    db.table("conversations").delete().eq("assistant_id", str(assistant_id)).execute()
+    try:
+        # 2. Cleanup Storage
+        docs = db.table("documents").select("storage_path").eq("assistant_id", str(assistant_id)).execute()
+        storage_paths = [doc["storage_path"] for doc in docs.data if doc.get("storage_path")]
 
-    # 3. Delete the assistant record itself
-    db.table("assistants").delete().eq("id", str(assistant_id)).execute()
-    logger.info("Assistant deleted id={}", assistant_id)
+        if storage_paths:
+            try:
+                db.storage.from_(settings.supabase_bucket).remove(storage_paths)
+                logger.info("Deleted {} files from storage", len(storage_paths))
+            except Exception as e:
+                logger.warning("Non-blocking storage error: {}", e)
+
+        # 3. Cleanup Database records
+        logger.info("Cleaning up database records for assistant_id={}", assistant_id)
+        db.table("chunks").delete().eq("assistant_id", str(assistant_id)).execute()
+        db.table("documents").delete().eq("assistant_id", str(assistant_id)).execute()
+        db.table("conversations").delete().eq("assistant_id", str(assistant_id)).execute()
+        
+        # 4. Final delete
+        db.table("assistants").delete().eq("id", str(assistant_id)).execute()
+        logger.info("Assistant {} successfully deleted", assistant_id)
+        
+    except Exception as exc:
+        logger.error("Failed to delete assistant {}: {}", assistant_id, exc)
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(exc)}")

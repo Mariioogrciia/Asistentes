@@ -74,6 +74,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await res.text();
     throw new Error(`API ${res.status}: ${text}`);
   }
+  
+  // Handle empty responses (like 204 No Content)
+  if (res.status === 204) return {} as T;
+  
   return res.json() as Promise<T>;
 }
 
@@ -87,9 +91,7 @@ export const api = {
     get: (id: string) => req<Assistant>(`/assistants/${id}`),
     update: (id: string, body: Partial<{ name: string; description: string; instructions: string }>) =>
       req<Assistant>(`/assistants/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      fetch(`${API_BASE}/assistants/${id}`, { method: "DELETE" })
-        .then(r => { if (!r.ok) throw new Error("Error al eliminar"); }),
+    delete: (id: string) => req(`/assistants/${id}/delete`, { method: "POST" }),
   },
 
   documents: {
