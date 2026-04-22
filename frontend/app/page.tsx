@@ -91,36 +91,41 @@ export default function HomePage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     // Check auth
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push("/login");
-      } else {
+      if (session) {
         setUser(session.user);
-        // Load profile and assistants
+        // Load profile and assistants only if logged in
         Promise.all([
           api.users.me(),
           api.assistants.list()
         ]).then(([me, list]) => {
           setProfile(me);
           setAssistants(list);
-        }).catch(() => setError("No se puede conectar con el servidor. ¿Está el backend activo?"))
+        }).catch(() => setError("Error al cargar datos. ¿Está el backend activo?"))
           .finally(() => setLoading(false));
+      } else {
+        setLoading(false);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.push("/login");
-      else {
+      if (session) {
         setUser(session.user);
         api.users.me().then(setProfile);
+        api.assistants.list().then(setAssistants).catch(() => {});
+      } else {
+        setUser(null);
+        setProfile(null);
+        setAssistants([]);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -159,19 +164,31 @@ export default function HomePage() {
                 ⚙️ Panel Admin
               </button>
             )}
-            {user && (
-              <div className={styles.userMenu}>
-                <span className={styles.userEmail}>{user.email}</span>
+            {user ? (
+              <div 
+                className={styles.userMenu} 
+                onClick={() => setShowProfileModal(true)} 
+                title="Editar perfil"
+                style={{ cursor: "pointer" }}
+              >
+                <span className={styles.userEmail}>{profile?.full_name || user.email}</span>
                 <button 
                   className="btn btn-ghost btn-sm" 
-                  onClick={() => api.auth.signOut()}
+                  onClick={(e) => { e.stopPropagation(); api.auth.signOut(); }}
                   title="Cerrar sesión"
                 >
                   Salir
                 </button>
               </div>
+            ) : (
+              <button className="btn btn-ghost btn-sm" onClick={() => router.push("/login")}>
+                Iniciar sesión
+              </button>
             )}
-            <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+            <button className="btn btn-primary btn-sm" onClick={() => {
+              if (!user) router.push("/login");
+              else setShowModal(true);
+            }}>
               <IconPlus />
               Nuevo asistente
             </button>
@@ -200,7 +217,8 @@ export default function HomePage() {
             <button
               className="btn btn-primary btn-lg"
               onClick={() => {
-                if (assistants.length === 0) setShowModal(true);
+                if (!user) router.push("/login");
+                else if (assistants.length === 0) setShowModal(true);
                 else document.getElementById("dashboard")?.scrollIntoView({ behavior: "smooth" });
               }}
             >
@@ -325,7 +343,83 @@ export default function HomePage() {
           }}
         />
       )}
+      {showProfileModal && profile && (
+        <UpdateProfileModal
+          profile={profile}
+          onClose={() => setShowProfileModal(false)}
+          onUpdated={(updated) => {
+            setProfile((prev: any) => ({ ...prev, full_name: updated.full_name }));
+            setShowProfileModal(false);
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+// ── UpdateProfileModal ────────────────────────────────────────────────────────
+
+function UpdateProfileModal({
+  profile,
+  onClose,
+  onUpdated,
+}: {
+  profile: any;
+  onClose: () => void;
+  onUpdated: (p: any) => void;
+}) {
+  const [fullName, setFullName] = useState(profile.full_name || "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const updated = await api.users.updateProfile({ full_name: fullName });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar perfil");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "400px" }}>
+        <div className="modal-header">
+          <h2>Editar Perfil</h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M1 1l12 12M13 1L1 13"/>
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className="field">
+            <label htmlFor="editFullName">Nombre Completo</label>
+            <input 
+              id="editFullName" 
+              className="input" 
+              value={fullName} 
+              onChange={e => setFullName(e.target.value)} 
+              placeholder="Tu nombre" 
+              required 
+              autoFocus
+            />
+          </div>
+          {error && <p className="text-sm" style={{ color: "var(--error)" }}>{error}</p>}
+          <div className="modal-footer">
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

@@ -6,15 +6,17 @@ import { supabase } from "@/lib/api";
 import styles from "./login.module.css";
 
 export default function LoginPage() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect if already logged in
+    // Solo redirigir si ya hay sesión y estamos en login
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) router.push("/");
     });
@@ -24,15 +26,27 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setStatusMessage(null);
 
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: { full_name: fullName }
+          }
         });
-        if (error) throw error;
-        alert("¡Registro con éxito! Revisa tu email para confirmar (si está activado) o inicia sesión.");
+        if (error) {
+          if (error.message.includes("rate limit")) {
+            throw new Error("Supabase ha bloqueado el registro por seguridad (límite de intentos). Espera 60 segundos o aumenta los límites en el panel de Supabase.");
+          }
+          throw error;
+        }
+        setStatusMessage({ 
+          type: "success", 
+          text: "¡Registro con éxito! Revisa tu email para confirmar o ya puedes iniciar sesión si la confirmación no es requerida." 
+        });
         setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -62,6 +76,21 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleAuth} className={styles.form}>
+          {isSignUp && (
+            <div className={styles.group}>
+              <label htmlFor="fullName">Nombre Completo</label>
+              <input
+                id="fullName"
+                type="text"
+                placeholder="Juan Pérez"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                className="input"
+              />
+            </div>
+          )}
+
           <div className={styles.group}>
             <label htmlFor="email">Email</label>
             <input
@@ -89,6 +118,11 @@ export default function LoginPage() {
           </div>
 
           {error && <div className={styles.error}>{error}</div>}
+          {statusMessage && (
+            <div className={statusMessage.type === "success" ? styles.success : styles.error}>
+              {statusMessage.text}
+            </div>
+          )}
 
           <button type="submit" disabled={loading} className="btn btn-primary">
             {loading ? "Cargando..." : isSignUp ? "Registrarse" : "Entrar"}
