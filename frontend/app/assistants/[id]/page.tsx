@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, type Assistant, type Conversation, type Document, type Message } from "@/lib/api";
+import { api, type Assistant, type Conversation, type Document, type Message, supabase } from "@/lib/api";
 import styles from "./page.module.css";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GalaxyBackground } from "@/components/GalaxyBackground";
@@ -31,20 +31,33 @@ export default function AssistantPage() {
   }, [id]);
 
   useEffect(() => {
-    Promise.all([
-      api.assistants.get(id),
-      api.conversations.list(id),
-      api.documents.list(id),
-    ]).then(([asst, convs, docs]) => {
-      setAssistant(asst);
-      setConversations(convs);
-      setDocuments(docs);
-      if (convs.length > 0) {
-        setActiveConv(convs[0]);
-        api.conversations.messages(convs[0].id).then(setMessages);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        // Load data
+        Promise.all([
+          api.assistants.get(id),
+          api.conversations.list(id),
+          api.documents.list(id),
+        ]).then(([asst, convs, docs]) => {
+          setAssistant(asst);
+          setConversations(convs);
+          setDocuments(docs);
+          if (convs.length > 0) {
+            setActiveConv(convs[0]);
+            api.conversations.messages(convs[0].id).then(setMessages);
+          }
+        }).catch(() => router.push("/"))
+          .finally(() => setLoading(false));
       }
-    }).catch(() => router.push("/"))
-      .finally(() => setLoading(false));
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.push("/login");
+    });
+
+    return () => subscription.unsubscribe();
   }, [id, router]);
 
   async function handleNewConversation() {
@@ -251,10 +264,19 @@ function ChatPanel({
     });
   }, [messages, streaming]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    const tx = textareaRef.current;
+    if (!tx) return;
+    tx.style.height = "auto";
+    tx.style.height = `${tx.scrollHeight}px`;
+  }, [input]);
+
   async function handleSend() {
     const content = input.trim();
     if (!content || streaming) return;
     setInput("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     // Optimistic user message
     const userMsg: Message = {
@@ -344,7 +366,13 @@ function ChatPanel({
             placeholder="Escribe tu pregunta… (Enter para enviar, Shift+Enter para nueva línea)"
             rows={1}
             disabled={streaming}
-            style={{ resize: "none", overflowY: "auto", maxHeight: "150px" }}
+            style={{ 
+              resize: "none", 
+              overflowY: "auto", 
+              maxHeight: "80px",
+              height: "auto",
+              minHeight: "24px"
+            }}
           />
           <button
             className={`btn ${styles.sendBtn}`}
@@ -595,7 +623,11 @@ function EditAssistantModal({
     }
   }
 
-  const PRESET_AVATARS = ["✦", "🤖", "🧠", "✨", "🚀", "💡", "🔮", "👽", "🦉", "⚖️", "💼", "📚"];
+  const PRESET_AVATARS = [
+    "✦", "🤖", "🧠", "✨", "🚀", "💡", "🔮", "👽", "🦉", "⚖️", "💼", "📚",
+    "⚽", "🏀", "🎾", "🏎️", "🚗", "✈️", "🚢", "🦁", "🐼", "🌿", "🌊",
+    "🛠️", "💻", "📱", "🔋", "🎨", "🎭", "🎸", "📷", "🍕", "☕", "🌍", "🔥"
+  ];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -617,7 +649,8 @@ function EditAssistantModal({
                     width: "40px", height: "40px", borderRadius: "50%",
                     fontSize: "1.5rem", background: localAvatar === a ? "var(--bg-active)" : "var(--bg-surface)",
                     border: localAvatar === a ? "2px solid var(--accent)" : "1px solid var(--border)",
-                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
+                    color: "var(--avatar-icon)"
                   }}
                 >
                   {a}

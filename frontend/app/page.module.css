@@ -411,3 +411,20 @@
   max-width: 34ch;
   color: var(--text-muted);
 }
+
+.userMenu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 8px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+.userEmail {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}

@@ -102,6 +102,7 @@ def ingest_document(
     assistant_name: str,
     db: Client,
     ai_client: AzureOpenAI,
+    user_id: uuid.UUID | None = None,
 ) -> dict:
     """Full ingestion pipeline for a single document.
 
@@ -154,6 +155,7 @@ def ingest_document(
         "size_bytes": len(content),
         "chunk_count": 0,
         "status": "processing",
+        "user_id": str(user_id) if user_id else None,
     }
     db.table("documents").insert(doc_record).execute()
 
@@ -189,6 +191,7 @@ def ingest_document(
                 # pgvector expects the vector as a plain Python list —
                 # supabase-py serializes it correctly via postgrest-py
                 "embedding": vector,
+                "user_id": str(user_id) if user_id else None,
                 "metadata": {"chunk_index": idx},
             }
             for idx, (chunk, vector) in enumerate(zip(chunks, vectors))

@@ -8,6 +8,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from backend.db import DbDep
+from backend.auth import UserDep
 
 router = APIRouter(prefix="/assistants", tags=["assistants"])
 
@@ -38,17 +39,24 @@ class AssistantOut(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=list[AssistantOut])
-def list_assistants(db: DbDep) -> list[dict]:
-    """Return all assistants ordered by creation date (newest first)."""
-    result = db.table("assistants").select("*").order("created_at", desc=True).execute()
+def list_assistants(db: DbDep, user: UserDep) -> list[dict]:
+    """Return assistants ordered by creation date. Regular users see only their own."""
+    query = db.table("assistants").select("*")
+    if user.role != "admin":
+        query = query.eq("user_id", str(user.id))
+    
+    result = query.order("created_at", desc=True).execute()
     return result.data
 
 
 @router.post("/", response_model=AssistantOut, status_code=201)
-def create_assistant(body: AssistantCreate, db: DbDep) -> dict:
-    """Create a new assistant."""
-    logger.info("Creating assistant name={}", body.name)
-    result = db.table("assistants").insert(body.model_dump()).execute()
+def create_assistant(body: AssistantCreate, db: DbDep, user: UserDep) -> dict:
+    """Create a new assistant associated with the current user."""
+    logger.info("Creating assistant name={} for user_id={}", body.name, user.id)
+    data = body.model_dump()
+    data["user_id"] = str(user.id)
+    
+    result = db.table("assistants").insert(data).execute()
     assistant = result.data[0]
     logger.info("Assistant created id={}", assistant["id"])
     return assistant
@@ -58,17 +66,16 @@ def create_assistant(body: AssistantCreate, db: DbDep) -> dict:
 def get_assistant(
     assistant_id: Annotated[uuid.UUID, Path()],
     db: DbDep,
+    user: UserDep,
 ) -> dict:
-    """Return a single assistant by ID."""
-    result = (
-        db.table("assistants")
-        .select("*")
-        .eq("id", str(assistant_id))
-        .single()
-        .execute()
-    )
+    """Return a single assistant by ID, ensuring ownership."""
+    query = db.table("assistants").select("*").eq("id", str(assistant_id))
+    if user.role != "admin":
+        query = query.eq("user_id", str(user.id))
+        
+    result = query.maybe_single().execute()
     if not result.data:
-        raise HTTPException(status_code=404, detail="Assistant not found")
+        raise HTTPException(status_code=404, detail="Assistant not found or access denied")
     return result.data
 
 
@@ -77,20 +84,20 @@ def update_assistant(
     assistant_id: Annotated[uuid.UUID, Path()],
     body: AssistantUpdate,
     db: DbDep,
+    user: UserDep,
 ) -> dict:
-    """Update name, description or instructions of an existing assistant."""
+    """Update an existing assistant, ensuring ownership."""
     changes = body.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(status_code=422, detail="No fields to update")
 
-    result = (
-        db.table("assistants")
-        .update(changes)
-        .eq("id", str(assistant_id))
-        .execute()
-    )
+    query = db.table("assistants").update(changes).eq("id", str(assistant_id))
+    if user.role != "admin":
+        query = query.eq("user_id", str(user.id))
+
+    result = query.execute()
     if not result.data:
-        raise HTTPException(status_code=404, detail="Assistant not found")
+        raise HTTPException(status_code=404, detail="Assistant not found or access denied")
     logger.info("Assistant updated id={} fields={}", assistant_id, list(changes))
     return result.data[0]
 
@@ -99,10 +106,20 @@ def update_assistant(
 def delete_assistant(
     assistant_id: Annotated[uuid.UUID, Path()],
     db: DbDep,
+    user: UserDep,
 ) -> None:
-    """Delete an assistant and all its documents, chunks, and conversations."""
+    """Delete an assistant and its associated data, ensuring ownership."""
     from backend.config import get_settings
     settings = get_settings()
+
+    # Verify ownership before deleting
+    query = db.table("assistants").select("id").eq("id", str(assistant_id))
+    if user.role != "admin":
+        query = query.eq("user_id", str(user.id))
+    
+    check = query.maybe_single().execute()
+    if not check.data:
+        raise HTTPException(status_code=404, detail="Assistant not found or access denied")
 
     # 1. Fetch all documents to delete their files from Storage
     docs = db.table("documents").select("storage_path").eq("assistant_id", str(assistant_id)).execute()
@@ -115,16 +132,11 @@ def delete_assistant(
         except Exception as exc:
             logger.warning("Could not delete files from storage error={}", exc)
 
-    # 2. Explicitly delete related DB records (in case CASCADE is not set up)
+    # 2. Explicitly delete related DB records
     db.table("chunks").delete().eq("assistant_id", str(assistant_id)).execute()
     db.table("documents").delete().eq("assistant_id", str(assistant_id)).execute()
-    
-    # Note: Conversations and messages should cascade automatically from the assistant deletion,
-    # but we can explicitly delete conversations as well.
     db.table("conversations").delete().eq("assistant_id", str(assistant_id)).execute()
 
     # 3. Delete the assistant record itself
-    result = db.table("assistants").delete().eq("id", str(assistant_id)).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Assistant not found")
+    db.table("assistants").delete().eq("id", str(assistant_id)).execute()
     logger.info("Assistant deleted id={}", assistant_id)

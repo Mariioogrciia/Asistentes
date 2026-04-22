@@ -1,6 +1,12 @@
-/** Typed API client for the RAG Assistants backend. */
+import { createClient } from "@supabase/supabase-js";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
+// Initialize Supabase client
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,8 +58,15 @@ export interface Source {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { 
+      "Content-Type": "application/json", 
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      ...init?.headers 
+    },
     cache: "no-store",
     ...init,
   });
@@ -82,11 +95,17 @@ export const api = {
   documents: {
     list: (assistantId: string) =>
       req<Document[]>(`/assistants/${assistantId}/documents/`),
-    upload: (assistantId: string, file: File) => {
+    upload: async (assistantId: string, file: File) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
       const form = new FormData();
       form.append("file", file);
       return fetch(`${API_BASE}/assistants/${assistantId}/documents/`, {
         method: "POST",
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: form,
       }).then(async (r) => {
         if (!r.ok) throw new Error(await r.text());
@@ -94,10 +113,8 @@ export const api = {
       });
     },
     delete: (assistantId: string, documentId: string) =>
-      fetch(`${API_BASE}/assistants/${assistantId}/documents/${documentId}`, {
+      req<void>(`/assistants/${assistantId}/documents/${documentId}`, {
         method: "DELETE",
-      }).then(r => {
-        if (!r.ok) throw new Error("Error al eliminar el documento");
       }),
   },
 
@@ -112,14 +129,32 @@ export const api = {
     messages: (conversationId: string) =>
       req<Message[]>(`/conversations/${conversationId}/messages/`),
     /** Returns a ReadableStream for SSE. */
-    sendMessage: (conversationId: string, content: string) =>
-      fetch(`${API_BASE}/conversations/${conversationId}/messages/`, {
+    sendMessage: async (conversationId: string, content: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      return fetch(`${API_BASE}/conversations/${conversationId}/messages/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ content }),
-      }),
+      });
+    },
     delete: (conversationId: string) =>
-      fetch(`${API_BASE}/conversations/${conversationId}`, { method: "DELETE" })
-        .then(r => { if (!r.ok) throw new Error("Error al eliminar la conversación"); }),
+      req<void>(`/conversations/${conversationId}`, { method: "DELETE" }),
   },
+
+  users: {
+    me: () => req<any>("/users/me"),
+    updateProfile: (body: { full_name?: string; avatar_url?: string }) =>
+      req<any>("/users/me", { method: "PUT", body: JSON.stringify(body) }),
+  },
+
+  auth: {
+    getUser: () => supabase.auth.getUser(),
+    signOut: () => supabase.auth.signOut(),
+    listUsers: () => req<any[]>("/users/"),
+  }
 };

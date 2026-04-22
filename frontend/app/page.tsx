@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, type Assistant } from "@/lib/api";
+import { api, type Assistant, supabase } from "@/lib/api";
 import styles from "./page.module.css";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GalaxyBackground } from "@/components/GalaxyBackground";
+import type { User } from "@supabase/supabase-js";
 
 // ── SVG icon set ───────────────────────────────────────────────────────────────
 
@@ -88,12 +89,38 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [assistantToDelete, setAssistantToDelete] = useState<Assistant | null>(null);
 
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any>(null);
+
   useEffect(() => {
-    api.assistants.list()
-      .then(setAssistants)
-      .catch(() => setError("No se puede conectar con el servidor. ¿Está el backend activo?"))
-      .finally(() => setLoading(false));
-  }, []);
+    // Check auth
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        setUser(session.user);
+        // Load profile and assistants
+        Promise.all([
+          api.users.me(),
+          api.assistants.list()
+        ]).then(([me, list]) => {
+          setProfile(me);
+          setAssistants(list);
+        }).catch(() => setError("No se puede conectar con el servidor. ¿Está el backend activo?"))
+          .finally(() => setLoading(false));
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.push("/login");
+      else {
+        setUser(session.user);
+        api.users.me().then(setProfile);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -123,6 +150,27 @@ export default function HomePage() {
           </div>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <ThemeToggle />
+            {profile?.role === "admin" && (
+              <button 
+                className="btn btn-ghost btn-sm" 
+                onClick={() => router.push("/admin")}
+                style={{ color: "var(--accent)", fontWeight: 600 }}
+              >
+                ⚙️ Panel Admin
+              </button>
+            )}
+            {user && (
+              <div className={styles.userMenu}>
+                <span className={styles.userEmail}>{user.email}</span>
+                <button 
+                  className="btn btn-ghost btn-sm" 
+                  onClick={() => api.auth.signOut()}
+                  title="Cerrar sesión"
+                >
+                  Salir
+                </button>
+              </div>
+            )}
             <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
               <IconPlus />
               Nuevo asistente

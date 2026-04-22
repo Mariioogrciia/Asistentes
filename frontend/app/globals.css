@@ -56,6 +56,14 @@
 
   --galaxy-bg: radial-gradient(ellipse at top, rgba(30,20,50,0.5) 0%, transparent 100%);
   --font: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Node & Bubble specific */
+  --node-line: rgba(255, 255, 255, 0.1);
+  --node-avatar-border: rgba(255, 255, 255, 0.1);
+  --bubble-user: var(--bg-surface);
+  --bubble-asst: rgba(255, 255, 255, 0.04);
+  --bubble-border: var(--border);
+  --avatar-icon: #ffffff;
 }
 
 [data-theme="light"] {
@@ -72,19 +80,25 @@
   --text-primary:   #111827;
   --text-secondary: #4b5563;
   --text-muted:     #9ca3af;
-  --text-accent:    #6d28d9;
+  --text-accent:    #0369a1;
 
-  --accent:       #7c5cfc;
-  --accent-dim:   rgba(124, 92, 252, 0.06);
-  --accent-mid:   rgba(124, 92, 252, 0.10);
-  --accent-glow:  rgba(124, 92, 252, 0.15);
-  --accent-hover: #6d28d9;
+  --accent:       #0ea5e9;
+  --accent-dim:   rgba(14, 165, 233, 0.08);
+  --accent-mid:   rgba(14, 165, 233, 0.15);
+  --accent-glow:  rgba(14, 165, 233, 0.25);
+  --accent-hover: #0284c7;
   
-  --galaxy-bg: radial-gradient(ellipse at top, rgba(124, 92, 252, 0.08) 0%, transparent 100%);
+  --galaxy-bg: radial-gradient(ellipse at top, rgba(14, 165, 233, 0.12) 0%, transparent 100%);
 
-  --shadow-sm:   0 1px 2px rgba(0,0,0,0.05);
-  --shadow:      0 4px 20px rgba(0,0,0,0.03);
   --shadow-lg:   0 12px 40px rgba(0,0,0,0.05);
+
+  /* Node & Bubble specific - higher contrast for light mode */
+  --node-line: rgba(0, 0, 0, 0.15);
+  --node-avatar-border: rgba(0, 0, 0, 0.1);
+  --bubble-user: #f3f4f6;
+  --bubble-asst: #ffffff;
+  --bubble-border: rgba(0, 0, 0, 0.08);
+  --avatar-icon: #111827;
 }
 
 /* ── Reset ──────────────────────────────────────────────────────────────────── */

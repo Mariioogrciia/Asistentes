@@ -9,7 +9,7 @@ from backend.ai import init_ai
 from backend.config import get_settings
 from backend.db import init_db
 from backend.logger import setup_logger
-from backend.routers import assistants, chat, documents
+from backend.routers import assistants, chat, documents, users
 
 
 @asynccontextmanager
@@ -38,7 +38,7 @@ app = FastAPI(
 # Adjust origins as needed for production.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "https://asistentes-xcoc.vercel.app"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173", "https://asistentes-xcoc.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,6 +48,7 @@ app.add_middleware(
 app.include_router(assistants.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(users.router)
 
 
 # ── Health check ───────────────────────────────────────────────────────────────

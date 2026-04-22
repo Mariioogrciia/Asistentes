@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from backend.ai import AiDep
 from backend.db import DbDep
+from backend.auth import UserDep
 from backend.services.rag import build_messages, retrieve_context, stream_answer
 
 router = APIRouter(tags=["chat"])
@@ -48,8 +49,18 @@ class MessageOut(BaseModel):
 def list_conversations(
     assistant_id: Annotated[uuid.UUID, Path()],
     db: DbDep,
+    user: UserDep,
 ) -> list[dict]:
-    """List all conversations for a given assistant."""
+    """List all conversations for a given assistant, ensuring ownership."""
+    # Verify assistant ownership
+    asst_query = db.table("assistants").select("id").eq("id", str(assistant_id))
+    if user.role != "admin":
+        asst_query = asst_query.eq("user_id", str(user.id))
+    
+    asst_check = asst_query.maybe_single().execute()
+    if not asst_check.data:
+        raise HTTPException(status_code=404, detail="Assistant not found or access denied")
+
     result = (
         db.table("conversations")
         .select("*")
@@ -65,18 +76,27 @@ def create_conversation(
     assistant_id: Annotated[uuid.UUID, Path()],
     body: ConversationCreate,
     db: DbDep,
+    user: UserDep,
 ) -> dict:
-    """Create a new conversation for an assistant."""
-    # Verify assistant exists
-    asst = db.table("assistants").select("id").eq("id", str(assistant_id)).maybe_single().execute()
+    """Create a new conversation, ensuring ownership."""
+    # Verify assistant ownership
+    asst_query = db.table("assistants").select("id").eq("id", str(assistant_id))
+    if user.role != "admin":
+        asst_query = asst_query.eq("user_id", str(user.id))
+        
+    asst = asst_query.maybe_single().execute()
     if not asst.data:
-        raise HTTPException(status_code=404, detail="Assistant not found")
+        raise HTTPException(status_code=404, detail="Assistant not found or access denied")
 
     result = db.table("conversations").insert(
-        {"assistant_id": str(assistant_id), "title": body.title}
+        {
+            "assistant_id": str(assistant_id), 
+            "title": body.title,
+            "user_id": str(user.id)
+        }
     ).execute()
     conv = result.data[0]
-    logger.info("Conversation created id={} assistant_id={}", conv["id"], assistant_id)
+    logger.info("Conversation created id={} for user_id={}", conv["id"], user.id)
     return conv
 
 
@@ -86,8 +106,18 @@ def create_conversation(
 def get_messages(
     conversation_id: Annotated[uuid.UUID, Path()],
     db: DbDep,
+    user: UserDep,
 ) -> list[dict]:
-    """Return the full message history for a conversation."""
+    """Return the full message history, ensuring ownership."""
+    # Verify conversation ownership
+    conv_query = db.table("conversations").select("id").eq("id", str(conversation_id))
+    if user.role != "admin":
+        conv_query = conv_query.eq("user_id", str(user.id))
+        
+    conv_check = conv_query.maybe_single().execute()
+    if not conv_check.data:
+        raise HTTPException(status_code=404, detail="Conversation not found or access denied")
+
     result = (
         db.table("messages")
         .select("*")
@@ -104,24 +134,21 @@ def send_message(
     body: MessageCreate,
     db: DbDep,
     ai: AiDep,
+    user: UserDep,
 ) -> StreamingResponse:
-    """Send a user message and stream the assistant reply via SSE.
-
-    The response is a text/event-stream. Each event contains a text token.
-    The final event is ``data: [DONE]``.
-    After streaming completes, both the user message and the full assistant
-    reply are persisted to the database.
-    """
+    """Send a message and stream reply, ensuring ownership."""
     # ── Fetch conversation + assistant ─────────────────────────────────────
-    conv_result = (
+    conv_query = (
         db.table("conversations")
-        .select("*, assistants(id, instructions)")
+        .select("*, assistants(id, instructions, user_id)")
         .eq("id", str(conversation_id))
-        .single()
-        .execute()
     )
+    if user.role != "admin":
+        conv_query = conv_query.eq("user_id", str(user.id))
+        
+    conv_result = conv_query.maybe_single().execute()
     if not conv_result.data:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(status_code=404, detail="Conversation not found or access denied")
 
     conversation = conv_result.data
     assistant_id = uuid.UUID(conversation["assistant_id"])
@@ -222,12 +249,19 @@ def send_message(
 def delete_conversation(
     conversation_id: Annotated[uuid.UUID, Path()],
     db: DbDep,
+    user: UserDep,
 ) -> None:
-    """Delete a conversation and all its messages."""
-    # Delete messages first (if cascade is not enabled)
+    """Delete a conversation, ensuring ownership."""
+    # Verify ownership
+    query = db.table("conversations").select("id").eq("id", str(conversation_id))
+    if user.role != "admin":
+        query = query.eq("user_id", str(user.id))
+    
+    check = query.maybe_single().execute()
+    if not check.data:
+        raise HTTPException(status_code=404, detail="Conversation not found or access denied")
+
     db.table("messages").delete().eq("conversation_id", str(conversation_id)).execute()
-    result = db.table("conversations").delete().eq("id", str(conversation_id)).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    logger.info("Conversation deleted id={}", conversation_id)
+    db.table("conversations").delete().eq("id", str(conversation_id)).execute()
+    logger.info("Conversation deleted id={} by user_id={}", conversation_id, user.id)
 
