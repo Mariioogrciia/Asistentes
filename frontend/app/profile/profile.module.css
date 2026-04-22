@@ -1,0 +1,249 @@
+.main {
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  position: relative;
+}
+
+.header {
+  height: 70px;
+  background: rgba(var(--bg-surface-rgb), 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.headerInner {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+}
+
+.logoMark {
+  color: var(--accent);
+}
+
+.content {
+  max-width: 1100px;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-bottom: 2.5rem;
+  background: linear-gradient(to bottom right, var(--text-primary), var(--text-muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 850px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: color-mix(in srgb, var(--bg-surface) 60%, transparent);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  padding: 2rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.countBadge {
+  background: var(--accent-dim);
+  color: var(--accent);
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.avatarPreview {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.avatarLarge {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px var(--accent-glow);
+  overflow: hidden;
+}
+
+.avatarLarge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.emailText {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.roleBadge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--accent-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.assistantList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.assistantItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.assistantItem:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  transform: translateX(4px);
+}
+
+.asstInfo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.asstIcon {
+  font-size: 1.5rem;
+}
+
+.asstName {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.asstDate {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.arrow {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.emptyText {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.success, .error {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+}

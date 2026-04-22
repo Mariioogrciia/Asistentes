@@ -85,7 +85,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   assistants: {
-    list: () => req<Assistant[]>("/assistants/"),
+    list: (userId?: string) => req<Assistant[]>(`/assistants/${userId ? `?user_id=${userId}` : ""}`),
     create: (body: { name: string; description?: string; instructions: string }) =>
       req<Assistant>("/assistants/", { method: "POST", body: JSON.stringify(body) }),
     get: (id: string) => req<Assistant>(`/assistants/${id}`),

@@ -39,11 +39,13 @@ class AssistantOut(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=list[AssistantOut])
-def list_assistants(db: DbDep, user: UserDep) -> list[dict]:
+def list_assistants(db: DbDep, user: UserDep, user_id: str | None = None) -> list[dict]:
     """Return assistants ordered by creation date. Regular users see only their own."""
     query = db.table("assistants").select("*")
     if user.role != "admin":
         query = query.eq("user_id", str(user.id))
+    elif user_id:
+        query = query.eq("user_id", user_id)
     
     result = query.order("created_at", desc=True).execute()
     return result.data

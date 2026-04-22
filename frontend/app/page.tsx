@@ -94,6 +94,14 @@ export default function HomePage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
+    // Load cached profile for instant feel
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("user_profile");
+      if (cached) {
+        try { setProfile(JSON.parse(cached)); } catch(e) {}
+      }
+    }
+
     // Check auth
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -103,7 +111,9 @@ export default function HomePage() {
           api.users.me(),
           api.assistants.list()
         ]).then(([me, list]) => {
-          setProfile(me);
+          const p = { ...me, ...me.profile };
+          setProfile(p);
+          localStorage.setItem("user_profile", JSON.stringify(p));
           setAssistants(list);
         }).catch(() => setError("Error al cargar datos. ¿Está el backend activo?"))
           .finally(() => setLoading(false));
@@ -115,12 +125,17 @@ export default function HomePage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setUser(session.user);
-        api.users.me().then(setProfile);
+        api.users.me().then(me => {
+          const p = { ...me, ...me.profile };
+          setProfile(p);
+          localStorage.setItem("user_profile", JSON.stringify(p));
+        });
         api.assistants.list().then(setAssistants).catch(() => {});
       } else {
         setUser(null);
         setProfile(null);
         setAssistants([]);
+        localStorage.removeItem("user_profile");
       }
     });
 
@@ -167,11 +182,13 @@ export default function HomePage() {
             {user ? (
               <div 
                 className={styles.userMenu} 
-                onClick={() => setShowProfileModal(true)} 
-                title="Editar perfil"
+                onClick={() => router.push("/profile")} 
+                title="Ver mi perfil"
                 style={{ cursor: "pointer" }}
               >
-                <span className={styles.userEmail}>{profile?.full_name || user.email}</span>
+                <span className={styles.userEmail}>
+                  {profile?.full_name || user?.user_metadata?.full_name || user.email}
+                </span>
                 <button 
                   className="btn btn-ghost btn-sm" 
                   onClick={(e) => { e.stopPropagation(); api.auth.signOut(); }}

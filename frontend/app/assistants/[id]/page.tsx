@@ -23,6 +23,7 @@ export default function AssistantPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [avatar, setAvatar] = useState("✦");
   const [drawer, setDrawer] = useState<"none" | "history" | "docs">("none");
+  const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
     if (id && typeof window !== "undefined") {
@@ -31,6 +32,14 @@ export default function AssistantPage() {
   }, [id]);
 
   useEffect(() => {
+    // Load cached profile
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("user_profile");
+      if (cached) {
+        try { setProfile(JSON.parse(cached)); } catch(e) {}
+      }
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         router.push("/login");
@@ -40,10 +49,14 @@ export default function AssistantPage() {
           api.assistants.get(id),
           api.conversations.list(id),
           api.documents.list(id),
-        ]).then(([asst, convs, docs]) => {
+          api.users.me(),
+        ]).then(([asst, convs, docs, me]) => {
           setAssistant(asst);
           setConversations(convs);
           setDocuments(docs);
+          const p = { ...me, ...me.profile };
+          setProfile(p);
+          localStorage.setItem("user_profile", JSON.stringify(p));
           if (convs.length > 0) {
             setActiveConv(convs[0]);
             api.conversations.messages(convs[0].id).then(setMessages);
@@ -54,7 +67,16 @@ export default function AssistantPage() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.push("/login");
+      if (session) {
+        api.users.me().then(me => {
+          const p = { ...me, ...me.profile };
+          setProfile(p);
+          localStorage.setItem("user_profile", JSON.stringify(p));
+        });
+      } else {
+        router.push("/login");
+        localStorage.removeItem("user_profile");
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -108,6 +130,11 @@ export default function AssistantPage() {
           <button className="btn btn-icon btn-ghost" onClick={() => setShowSettings(true)} title="Ajustes">
              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </button>
+          <div className={styles.navUser} onClick={() => router.push("/profile")} style={{ cursor: "pointer" }} title="Ver mi perfil">
+            <span className={styles.userName}>
+              {profile?.full_name || profile?.email || "..."}
+            </span>
+          </div>
           <div style={{ marginLeft: "0.5rem" }}><ThemeToggle /></div>
         </div>
       </header>
