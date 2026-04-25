@@ -29,6 +29,7 @@ class AssistantUpdate(BaseModel):
 
 class AssistantOut(BaseModel):
     id: uuid.UUID
+    user_id: uuid.UUID
     name: str
     description: str | None
     instructions: str
@@ -40,12 +41,26 @@ class AssistantOut(BaseModel):
 
 @router.get("/", response_model=list[AssistantOut])
 def list_assistants(db: DbDep, user: UserDep, user_id: str | None = None) -> list[dict]:
-    """Return assistants ordered by creation date. Regular users see only their own."""
+    """Return assistants ordered by creation date.
+    
+    Default behavior: Users (including admins) see only their own assistants.
+    Admin behavior: Can pass a specific 'user_id' to filter, or 'all' to see everything.
+    """
     query = db.table("assistants").select("*")
-    if user.role != "admin":
+    
+    if user.role == "admin":
+        if user_id == "all":
+            # Admin sees everything
+            pass
+        elif user_id:
+            # Admin sees a specific user's assistants
+            query = query.eq("user_id", user_id)
+        else:
+            # Admin sees their own by default
+            query = query.eq("user_id", str(user.id))
+    else:
+        # Regular users always see only their own
         query = query.eq("user_id", str(user.id))
-    elif user_id:
-        query = query.eq("user_id", user_id)
     
     result = query.order("created_at", desc=True).execute()
     return result.data

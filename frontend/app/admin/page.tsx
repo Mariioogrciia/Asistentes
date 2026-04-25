@@ -59,7 +59,7 @@ export default function AdminPage() {
         try {
           const [allUsers, assts] = await Promise.all([
             api.auth.listUsers(),
-            api.assistants.list()
+            api.assistants.list("all")
           ]);
           setUsers(allUsers);
           setAllAssistants(assts);
@@ -217,10 +217,10 @@ export default function AdminPage() {
                         </div>
                       </div>
                     </td>
-                    <td className={styles.mono}>{a.user_id.slice(0, 13)}...</td>
+                    <td className={styles.mono}>{a.user_id?.slice(0, 13) || "---"}...</td>
                     <td>
                       <div className={styles.instrPreview} title={a.instructions}>
-                        {a.instructions.slice(0, 50)}...
+                        {a.instructions?.slice(0, 50)}...
                       </div>
                     </td>
                     <td className={styles.date}>{new Date(a.created_at).toLocaleDateString()}</td>

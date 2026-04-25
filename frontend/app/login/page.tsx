@@ -17,7 +17,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Solo redirigir si ya hay sesión y estamos en login
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data }) => {
+      const session = data.session;
       if (session) router.push("/");
     });
   }, [router]);

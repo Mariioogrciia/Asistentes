@@ -40,7 +40,8 @@ export default function AssistantPage() {
       }
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data }) => {
+      const session = data.session;
       if (!session) {
         router.push("/login");
       } else {

@@ -103,7 +103,8 @@ export default function HomePage() {
     }
 
     // Check auth
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data }) => {
+      const session = data.session;
       if (session) {
         setUser(session.user);
         // Load profile and assistants only if logged in
