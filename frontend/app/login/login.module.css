@@ -159,11 +159,39 @@
   transition: all var(--transition);
 }
 
-.googleBtn:hover:not(:disabled) {
-  background: var(--bg-hover);
+.socialBtn:hover:not(:disabled) {
+  background: var(--bg-active);
   border-color: var(--border-strong);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .container {
+    padding: 1rem;
+    align-items: flex-start;
+    padding-top: 10vh;
+  }
+
+  .card {
+    padding: 1.75rem 1.25rem;
+    border-radius: 20px;
+    max-width: 100%;
+  }
+
+  .header h1 {
+    font-size: 1.4rem;
+  }
+
+  .logo {
+    font-size: 2rem;
+  }
+
+  .glow {
+    width: 300px;
+    height: 300px;
+  }
 }
 
 .googleBtn:disabled {

@@ -262,3 +262,83 @@
   text-overflow: ellipsis;
   cursor: help;
 }
+
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .headerInner {
+    padding: 0 1rem;
+  }
+
+  .content {
+    margin: 1rem auto;
+    padding: 0 1rem;
+  }
+
+  /* Stats cards: 2 per row on tablet */
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .statCard {
+    padding: 1rem;
+  }
+
+  .statValue {
+    font-size: 1.5rem;
+  }
+
+  /* Scrollable table on mobile */
+  .tableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+  }
+
+  /* Tabs smaller */
+  .tabs {
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding-bottom: 0;
+  }
+
+  .tab {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8125rem;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Stats single column on phone */
+  .statsRow {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .statCard h3 {
+    font-size: 0.7rem;
+  }
+
+  .statValue {
+    font-size: 1.25rem;
+  }
+
+  /* Header: hide logo text */
+  .logo span:last-child {
+    display: none;
+  }
+
+  /* Table: hide less important columns */
+  .table th:nth-child(4),
+  .table td:nth-child(4) {
+    display: none;
+  }
+}
+

@@ -309,3 +309,92 @@
   text-align: right;
 }
 
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    gap: 1.25rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .statCard {
+    padding: 1rem;
+    gap: 0.875rem;
+  }
+
+  .statIcon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.375rem;
+    border-radius: 10px;
+  }
+
+  .statValue {
+    font-size: 1.5rem;
+  }
+
+  .chartCard {
+    padding: 1.25rem;
+  }
+
+  .ratingsContainer {
+    padding: 1.25rem;
+  }
+
+  .ratingsHeader,
+  .ratingsRow {
+    grid-template-columns: 1fr 50px 50px 100px;
+    gap: 0.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .scoreBar {
+    min-width: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .statsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .statTitle {
+    font-size: 0.6875rem;
+  }
+
+  .statValue {
+    font-size: 1.25rem;
+  }
+
+  .statIcon {
+    display: none;
+  }
+
+  /* Simplify ratings on phone: hide thumbs down */
+  .ratingsHeader,
+  .ratingsRow {
+    grid-template-columns: 1fr 44px 120px;
+  }
+
+  .ratingsHeader span:nth-child(3),
+  .ratingsDown {
+    display: none;
+  }
+
+  .ratingsName {
+    font-size: 0.8125rem;
+  }
+}
+
+

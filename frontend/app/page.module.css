@@ -428,3 +428,86 @@
   color: var(--text-secondary);
   font-weight: 500;
 }
+
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .headerInner {
+    padding: 0 1rem;
+  }
+
+  .userEmail {
+    display: none;
+  }
+
+  .userMenu {
+    gap: 6px;
+    padding: 4px 8px;
+    margin-right: 4px;
+  }
+
+  .content {
+    padding: 0 1rem 3rem;
+  }
+
+  .hero {
+    padding: 4rem 0 3rem;
+  }
+
+  .heroTitle {
+    font-size: clamp(2rem, 8vw, 2.5rem);
+  }
+
+  .heroSubtitle {
+    font-size: 0.9375rem;
+  }
+
+  .heroActions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .heroActions .btn {
+    justify-content: center;
+  }
+
+  .featuresGrid {
+    grid-template-columns: 1fr;
+    margin-bottom: 3rem;
+  }
+
+  .featureCard {
+    padding: 1.5rem;
+  }
+
+  .dashboardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .dashboardHeader .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 3rem 0 2rem;
+  }
+
+  .heroBadge {
+    font-size: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .divider {
+    margin-bottom: 2.5rem;
+  }
+}
+

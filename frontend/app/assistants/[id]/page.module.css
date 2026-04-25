@@ -192,6 +192,153 @@
   text-overflow: ellipsis;
 }
 
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .topNav {
+    top: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    gap: 0.75rem;
+    max-width: 95vw;
+  }
+
+  /* Collapse nav text labels on smaller screens */
+  .navText {
+    display: none;
+  }
+
+  /* Tighter gap on navRight */
+  .navRight {
+    gap: 0.25rem;
+  }
+
+  /* Hide user name on medium screens */
+  .navUser {
+    display: none;
+  }
+
+  .chatCanvas {
+    padding-top: 4.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .topNav {
+    top: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    gap: 0.5rem;
+    border-radius: 16px;
+  }
+
+  .navAssistant {
+    padding: 0.25rem 0.375rem;
+  }
+
+  .navName {
+    font-size: 0.8125rem;
+    max-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .navStatus {
+    display: none;
+  }
+
+  .messages {
+    padding: 1.25rem 1rem;
+    gap: 1.5rem;
+  }
+
+  .nodeGroup {
+    gap: 0.75rem;
+  }
+
+  .nodeAvatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.875rem;
+  }
+
+  .inputArea {
+    padding: 1rem 1rem 1.5rem;
+  }
+
+  .inputContainer {
+    border-radius: 18px;
+    padding: 0.5rem 0.75rem 0.5rem 1.25rem;
+  }
+
+  /* Drawer full width on mobile */
+  .drawer {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Switcher dropdown full width on mobile */
+  .switcherDropdown {
+    min-width: 260px;
+    max-width: calc(100vw - 2rem);
+  }
+
+  /* Suggestions grid single column on mobile */
+  .suggestionsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ratingsHeader,
+  .ratingsRow {
+    grid-template-columns: 1fr 45px 45px 120px;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .topNav {
+    padding: 0.3rem 0.5rem;
+    gap: 0.25rem;
+  }
+
+  /* Hide avatar in super small, keep just name */
+  .navName {
+    max-width: 70px;
+  }
+
+  .chatCanvas {
+    padding-top: 4rem;
+  }
+
+  .messages {
+    padding: 1rem 0.75rem;
+  }
+
+  .nodeUser .nodeContent,
+  .nodeAssistant .nodeContent {
+    padding: 0.75rem 1rem;
+  }
+
+  .emptyCanvas h2 {
+    font-size: 1.25rem;
+  }
+
+  .emptyCanvasIcon {
+    font-size: 2rem;
+  }
+
+  /* Ratings table adapt */
+  .ratingsHeader,
+  .ratingsRow {
+    grid-template-columns: 1fr 40px 120px;
+  }
+
+  /* Hide thumbs down column on very small screens */
+  .ratingsDown {
+    display: none;
+  }
+}
+
+
 .navAvatar {
   width: 28px;
   height: 28px;
