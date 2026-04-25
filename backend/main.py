@@ -9,7 +9,7 @@ from backend.ai import init_ai
 from backend.config import get_settings
 from backend.db import init_db
 from backend.logger import setup_logger
-from backend.routers import assistants, chat, documents, users
+from backend.routers import assistants, chat, documents, users, analytics
 
 
 @asynccontextmanager
@@ -36,8 +36,13 @@ app = FastAPI(
 # ── CORS ───────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -47,6 +52,7 @@ app.include_router(assistants.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(users.router)
+app.include_router(analytics.router)
 
 
 # ── Health check ───────────────────────────────────────────────────────────────

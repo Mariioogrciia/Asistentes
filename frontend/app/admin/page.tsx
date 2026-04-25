@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, supabase, type AdminUserCreateBody, type Assistant } from "@/lib/api";
 import styles from "./admin.module.css";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 
 interface UserProfile {
   id: string;
@@ -34,8 +35,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [tab, setTab] = useState<"users" | "assistants">("users");
+  const [tab, setTab] = useState<"users" | "assistants" | "analytics">("users");
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [userAssistants, setUserAssistants] = useState<Assistant[]>([]);
   const [loadingUserAssts, setLoadingUserAssts] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -57,6 +60,21 @@ export default function AdminPage() {
     ]);
     setUsers(allUsers);
     setAllAssistants(assts);
+    
+    // Also preload stats if we switch to that tab
+    loadStats();
+  }
+
+  async function loadStats() {
+    setLoadingStats(true);
+    try {
+      const stats = await api.analytics.admin();
+      setAdminStats(stats);
+    } catch (err) {
+      console.error("Error loading stats:", err);
+    } finally {
+      setLoadingStats(false);
+    }
   }
 
   useEffect(() => {
@@ -262,7 +280,17 @@ export default function AdminPage() {
           >
             Todos los Asistentes
           </button>
+          <button 
+            className={`${styles.tab} ${tab === "analytics" ? styles.tabActive : ""}`} 
+            onClick={() => setTab("analytics")}
+          >
+            Analíticas
+          </button>
         </div>
+
+        {tab === "analytics" && (
+          <AnalyticsDashboard isAdmin={true} data={adminStats} />
+        )}
 
         {tab === "users" && (
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>

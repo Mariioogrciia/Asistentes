@@ -33,13 +33,14 @@ export default function ProfilePage() {
           api.users.me(),
           api.assistants.list()
         ]);
-
+  
         setUser(session.user);
         const p = { ...me, ...me.profile };
         setProfile(p);
         setFullName(p.full_name || "");
         setAvatarUrl(p.avatar_url || "");
         setAssistants(assts);
+        
       } catch (err) {
         console.error("Error loading profile:", err);
       } finally {
@@ -177,6 +178,7 @@ export default function ProfilePage() {
             </button>
           </section>
         </div>
+
       </div>
     </main>
   );

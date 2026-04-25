@@ -2,9 +2,34 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { api, type Assistant, type Conversation, type Document, type DocumentChunk, type Message, type Source, supabase } from "@/lib/api";
 import styles from "./page.module.css";
 import { ThemeToggle } from "@/components/ThemeToggle";
+
+const markdownComponents: Components = {
+  code({ className, children }) {
+    const match = /language-(\w+)/.exec(className || "");
+    if (match) {
+      return (
+        <SyntaxHighlighter
+          style={oneDark}
+          language={match[1]}
+          PreTag="div"
+          className={styles.markdownCodeBlock}
+        >
+          {String(children).replace(/\n$/, "")}
+        </SyntaxHighlighter>
+      );
+    }
+
+    return <code className={styles.markdownInlineCode}>{children}</code>;
+  },
+};
 
 export default function AssistantPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +52,53 @@ export default function AssistantPage() {
   const [viewerLoading, setViewerLoading] = useState(false);
   const [viewerError, setViewerError] = useState("");
   const [viewerFocusChunkId, setViewerFocusChunkId] = useState<string | null>(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsSource, setSuggestionsSource] = useState<"docs" | "general">("general");
+  const [pendingSeedQuestion, setPendingSeedQuestion] = useState<string | null>(null);
+  const [showSwitcher, setShowSwitcher] = useState(false);
+  const [userAssistants, setUserAssistants] = useState<Assistant[]>([]);
+  const [switcherLoading, setSwitcherLoading] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
+
+  // Close switcher when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setShowSwitcher(false);
+      }
+    }
+    if (showSwitcher) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSwitcher]);
+
+  async function handleOpenSwitcher() {
+    setShowSwitcher(prev => !prev);
+    if (userAssistants.length === 0) {
+      setSwitcherLoading(true);
+      try {
+        const list = await api.assistants.list();
+        setUserAssistants(list);
+      } catch {
+        setUserAssistants([]);
+      } finally {
+        setSwitcherLoading(false);
+      }
+    }
+  }
+
+  const refreshSuggestedQuestions = useCallback(async () => {
+    setSuggestionsLoading(true);
+    try {
+      const result = await api.assistants.suggestedQuestions(id);
+      setSuggestedQuestions(result.questions);
+      setSuggestionsSource(result.based_on_documents ? "docs" : "general");
+    } catch {
+      setSuggestedQuestions([]);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     if (id && typeof window !== "undefined") {
@@ -54,7 +126,7 @@ export default function AssistantPage() {
           api.conversations.list(id),
           api.documents.list(id),
           api.users.me(),
-        ]).then(([asst, convs, docs, me]) => {
+        ]).then(async ([asst, convs, docs, me]) => {
           setAssistant(asst);
           setConversations(convs);
           setDocuments(docs);
@@ -63,8 +135,10 @@ export default function AssistantPage() {
           localStorage.setItem("user_profile", JSON.stringify(p));
           if (convs.length > 0) {
             setActiveConv(convs[0]);
-            api.conversations.messages(convs[0].id).then(setMessages);
+            const convMessages = await api.conversations.messages(convs[0].id);
+            setMessages(convMessages);
           }
+          await refreshSuggestedQuestions();
         }).catch(() => router.push("/"))
           .finally(() => setLoading(false));
       }
@@ -84,7 +158,7 @@ export default function AssistantPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [id, router]);
+  }, [id, refreshSuggestedQuestions, router]);
 
   async function handleNewConversation() {
     const conv = await api.conversations.create(id);
@@ -97,6 +171,20 @@ export default function AssistantPage() {
     setActiveConv(conv);
     const msgs = await api.conversations.messages(conv.id);
     setMessages(msgs);
+  }
+
+
+  async function startConversationWithSuggestion(question: string) {
+    if (activeConv) {
+      setPendingSeedQuestion(question);
+      return;
+    }
+
+    const conv = await api.conversations.create(id);
+    setConversations(prev => [conv, ...prev]);
+    setActiveConv(conv);
+    setMessages([]);
+    setPendingSeedQuestion(question);
   }
 
   const openDocumentViewer = useCallback(async (documentId: string, focusChunkId?: string) => {
@@ -133,6 +221,44 @@ export default function AssistantPage() {
     openDocumentViewer(source.document_id, source.chunk_id);
   }, [openDocumentViewer]);
 
+  const handleExportMarkdown = useCallback(() => {
+    if (messages.length === 0) return alert("No hay mensajes para exportar.");
+
+    let content = `# Conversación con ${assistant?.name}\n\n`;
+    content += `> **Asistente:** ${assistant?.name}\n`;
+    content += `> **Fecha:** ${new Date().toLocaleString()}\n`;
+    content += `> **ID Conversación:** ${activeConv?.id}\n\n`;
+    content += `---\n\n`;
+
+    messages.forEach((m) => {
+      const role = m.role === "user" ? "### 👤 TÚ" : `### 🤖 ${assistant?.name || "Asistente"}`;
+      content += `${role}\n\n${m.content}\n\n`;
+      
+      if (m.role === "assistant" && m.sources && m.sources.length > 0) {
+        content += `#### 📚 Fuentes Consultadas:\n`;
+        const uniqueDocs = new Set();
+        m.sources.forEach((s) => {
+          const docName = s.document_filename || "Documento";
+          if (!uniqueDocs.has(docName)) {
+            content += `- **${docName}** (Fragmento #${s.chunk_index})\n`;
+            uniqueDocs.add(docName);
+          }
+        });
+        content += `\n`;
+      }
+      content += `---\n\n`;
+    });
+
+    const blob = new Blob([content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safeTitle = (activeConv?.title || "conversacion").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    a.download = `chat_${safeTitle}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [messages, assistant, activeConv]);
+
   if (loading) return <PageLoader />;
   if (!assistant) return null;
 
@@ -147,12 +273,73 @@ export default function AssistantPage() {
           <button className="btn btn-icon btn-ghost" onClick={() => router.push("/")} title="Volver al Inicio">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
-          <div className={styles.navAssistant}>
-            <div className={styles.navAvatar}>{avatar}</div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span className={styles.navName}>{assistant.name}</span>
-              <span className={styles.navStatus}>Online</span>
-            </div>
+          <div className={styles.navAssistantWrapper} ref={switcherRef}>
+            <button
+              className={styles.navAssistant}
+              onClick={handleOpenSwitcher}
+              title="Cambiar de asistente"
+            >
+              <div className={styles.navAvatar}>{avatar}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <span className={styles.navName}>{assistant.name}</span>
+                <span className={styles.navStatus}>Online</span>
+              </div>
+              <svg
+                width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                style={{ marginLeft: 4, opacity: 0.5, transform: showSwitcher ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {showSwitcher && (
+              <div className={styles.switcherDropdown}>
+                <div className={styles.switcherHeader}>Mis Asistentes</div>
+                {switcherLoading ? (
+                  <div className={styles.switcherLoading}>
+                    <span className="spinner" style={{ width: 16, height: 16 }} />
+                  </div>
+                ) : userAssistants.length <= 1 ? (
+                  <div className={styles.switcherEmpty}>
+                    <span>No tienes más asistentes</span>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}
+                      onClick={() => { setShowSwitcher(false); router.push('/'); }}
+                    >
+                      Crear uno nuevo
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.switcherList}>
+                    {userAssistants
+                      .filter(a => a.id !== id)
+                      .map(a => (
+                        <button
+                          key={a.id}
+                          className={styles.switcherItem}
+                          onClick={() => { setShowSwitcher(false); router.push(`/assistants/${a.id}`); }}
+                        >
+                          <div className={styles.switcherItemAvatar}>
+                            {localStorage.getItem(`avatar_${a.id}`) || "❆"}
+                          </div>
+                          <div className={styles.switcherItemInfo}>
+                            <span className={styles.switcherItemName}>{a.name}</span>
+                            {a.description && (
+                              <span className={styles.switcherItemDesc}>{a.description}</span>
+                            )}
+                          </div>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         
@@ -164,6 +351,9 @@ export default function AssistantPage() {
           <button className={`btn btn-ghost ${drawer === "docs" ? styles.navActive : ""}`} onClick={() => setDrawer(d => d === "docs" ? "none" : "docs")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <span className={styles.navText}>Docs ({documents.length})</span>
+          </button>
+          <button className="btn btn-icon btn-ghost" onClick={handleExportMarkdown} title="Exportar Chat (Markdown)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           </button>
           <button className="btn btn-icon btn-ghost" onClick={() => setShowSettings(true)} title="Ajustes">
              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -195,29 +385,60 @@ export default function AssistantPage() {
                 onDeleteRequest={setDocToDelete}
                 onOpenDocument={(documentId) => openDocumentViewer(documentId)}
                 onOpenOriginal={openDocumentOriginal}
+                onUploadCompleted={refreshSuggestedQuestions}
               />
             )}
           </div>
         </div>
       )}
-
       {/* Main Chat Canvas */}
       <main className={styles.chatCanvas}>
         {activeConv ? (
           <ChatPanel
             conversation={activeConv}
             messages={messages}
+            suggestions={suggestedQuestions}
+            suggestionsLoading={suggestionsLoading}
+            suggestionsSource={suggestionsSource}
+            seedQuestion={pendingSeedQuestion}
+            onSeedQuestionConsumed={() => setPendingSeedQuestion(null)}
             onNewMessage={(msg) => setMessages(prev => [...prev, msg])}
             onUpdateLastMessage={(content) => setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content } : m))}
             onReplaceMessages={setMessages}
             onSourceOpen={handleOpenSource}
+            onSend={(q) => startConversationWithSuggestion(q)}
+            onStreamFinished={async () => {
+              const updated = await api.conversations.list(id);
+              setConversations(updated);
+            }}
           />
         ) : (
           <div className={styles.emptyCanvas}>
             <div className={styles.emptyCanvasIcon}>✨</div>
             <h2>Lienzo en blanco</h2>
             <p className="text-muted">Inicia una nueva exploración con {assistant.name}</p>
-            <button className={`${styles.glowingBtn} mt-6`} onClick={handleNewConversation}>Comenzar</button>
+            
+            {suggestedQuestions.length > 0 && (
+              <div className={styles.initialSuggestions}>
+                <p className={styles.suggestionsLabel}>Prueba a preguntar:</p>
+                <div className={styles.suggestionsGrid}>
+                  {suggestedQuestions.map((q, i) => (
+                    <button 
+                      key={i} 
+                      className={styles.suggestionBubble}
+                      onClick={async () => {
+                        await handleNewConversation();
+                        setPendingSeedQuestion(q);
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button className={`${styles.glowingBtn} mt-6`} onClick={handleNewConversation}>Comenzar ahora</button>
           </div>
         )}
       </main>
@@ -297,57 +518,23 @@ export default function AssistantPage() {
   );
 }
 
-// ── ConversationList ───────────────────────────────────────────────────────────
-function ConversationList({
-  conversations, active, onSelect, onNew, onDelete
-}: {
-  conversations: Conversation[];
-  active: Conversation | null;
-  onSelect: (c: Conversation) => void;
-  onNew: () => void;
-  onDelete: (c: Conversation) => void;
-}) {
-  return (
-    <div className={styles.convList}>
-      <button className="btn btn-primary w-full" style={{ marginBottom: "0.75rem" }} onClick={onNew}>
-        + Nueva conversación
-      </button>
-      {conversations.length === 0 ? (
-        <p className="text-sm text-muted" style={{ padding: "0.5rem" }}>Sin conversaciones</p>
-      ) : conversations.map(c => (
-        <div key={c.id} className={styles.convItemWrapper}>
-          <button
-            className={`${styles.convItem} ${active?.id === c.id ? styles.convItemActive : ""}`}
-            onClick={() => onSelect(c)}
-          >
-            <span className={styles.convTitle}>{c.title || "Nueva conversación"}</span>
-            <span className="text-xs text-muted">
-              {new Date(c.updated_at).toLocaleDateString("es-ES")}
-            </span>
-          </button>
-          <button
-            className={styles.convDeleteBtn}
-            onClick={(e) => { e.stopPropagation(); onDelete(c); }}
-            title="Eliminar conversación"
-          >
-            ✕
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ── ChatPanel ──────────────────────────────────────────────────────────────────
 function ChatPanel({
-  conversation, messages, onNewMessage, onUpdateLastMessage, onReplaceMessages, onSourceOpen,
+  conversation, messages, suggestions, suggestionsLoading, suggestionsSource, seedQuestion, onSeedQuestionConsumed, onNewMessage, onUpdateLastMessage, onReplaceMessages, onSourceOpen, onSend, onStreamFinished
 }: {
   conversation: Conversation;
   messages: Message[];
+  suggestions: string[];
+  suggestionsLoading: boolean;
+  suggestionsSource: "docs" | "general";
+  seedQuestion: string | null;
+  onSeedQuestionConsumed: () => void;
   onNewMessage: (m: Message) => void;
   onUpdateLastMessage: (content: string) => void;
   onReplaceMessages: (messages: Message[]) => void;
   onSourceOpen: (source: Source) => void;
+  onSend: (content: string) => void;
+  onStreamFinished?: () => void;
 }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -355,14 +542,12 @@ function ChatPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // Evita el comportamiento de "subir iterativamente" o saltos durante el streaming
     bottomRef.current?.scrollIntoView({ 
       behavior: streaming ? "auto" : "smooth",
       block: "end"
     });
   }, [messages, streaming]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const tx = textareaRef.current;
     if (!tx) return;
@@ -370,13 +555,19 @@ function ChatPanel({
     tx.style.height = `${tx.scrollHeight}px`;
   }, [input]);
 
-  async function handleSend() {
-    const content = input.trim();
+  useEffect(() => {
+    if (seedQuestion && !streaming) {
+      const q = seedQuestion;
+      onSeedQuestionConsumed(); // Consume immediately
+      sendContent(q);
+    }
+  }, [seedQuestion, streaming, onSeedQuestionConsumed]);
+
+  async function sendContent(content: string) {
     if (!content || streaming) return;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-    // Optimistic user message
     const userMsg: Message = {
       id: crypto.randomUUID(),
       conversation_id: conversation.id,
@@ -387,7 +578,6 @@ function ChatPanel({
     };
     onNewMessage(userMsg);
 
-    // Placeholder assistant message
     const asstMsg: Message = {
       id: crypto.randomUUID(),
       conversation_id: conversation.id,
@@ -398,6 +588,7 @@ function ChatPanel({
     };
     onNewMessage(asstMsg);
     setStreaming(true);
+    window.dispatchEvent(new CustomEvent("ai-stream-start"));
 
     try {
       const res = await api.conversations.sendMessage(conversation.id, content);
@@ -431,7 +622,14 @@ function ChatPanel({
       onUpdateLastMessage("⚠️ Error al conectar con el asistente.");
     } finally {
       setStreaming(false);
+      window.dispatchEvent(new CustomEvent("ai-stream-end"));
+      onStreamFinished?.();
     }
+  }
+
+  async function handleSend() {
+    const content = input.trim();
+    if (content) await sendContent(content);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -449,10 +647,29 @@ function ChatPanel({
 
       <div className={styles.messages}>
         {messages.length === 0 && (
-          <div className="empty" style={{ marginTop: "4rem" }}>
-            <div className="empty-icon">✨</div>
+          <div className="empty" style={{ marginTop: "2rem" }}>
+            <div className="empty-icon" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>✨</div>
             <h3>¡Empieza a chatear!</h3>
-            <p>Pregunta cualquier cosa sobre los documentos de este asistente.</p>
+            <p className="text-muted">Pregunta cualquier cosa sobre los documentos de este asistente.</p>
+            
+            {suggestions.length > 0 && (
+              <div className={styles.chatSuggestions}>
+                <p className={styles.chatSuggestionsLabel}>
+                  {suggestionsSource === "docs" ? "Basado en tus documentos:" : "Sugerencias para empezar:"}
+                </p>
+                <div className={styles.suggestionsGrid}>
+                  {suggestions.map((q, i) => (
+                    <button 
+                      key={i} 
+                      className={styles.suggestionBubble}
+                      onClick={() => sendContent(q)}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {messages.map((msg, i) => (
@@ -462,6 +679,7 @@ function ChatPanel({
             isLastStreaming={streaming && i === messages.length - 1}
             assistantAvatar={localStorage.getItem(`avatar_${conversation.assistant_id}`) || "✦"}
             onOpenSource={onSourceOpen}
+            conversationId={conversation.id}
           />
         ))}
         <div ref={bottomRef} />
@@ -501,9 +719,33 @@ function ChatPanel({
 }
 
 // ── Node Stream (No classic bubbles) ──────────────────────────────────────────
-function MessageBubble({ message, isLastStreaming, assistantAvatar, onOpenSource }: { message: Message; isLastStreaming: boolean; assistantAvatar: string; onOpenSource: (source: Source) => void }) {
+function MessageBubble({ message, isLastStreaming, assistantAvatar, onOpenSource, conversationId }: { 
+  message: Message; 
+  isLastStreaming: boolean; 
+  assistantAvatar: string; 
+  onOpenSource: (source: Source) => void;
+  conversationId: string;
+}) {
   const isUser = message.role === "user";
   const [showSources, setShowSources] = useState(false);
+  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  async function handleFeedback(rating: "up" | "down") {
+    if (feedbackLoading) return;
+    const newRating = feedback === rating ? null : rating; // toggle off if same
+    setFeedback(newRating); // optimistic
+    setFeedbackLoading(true);
+    try {
+      if (newRating) {
+        await api.conversations.feedback(conversationId, message.id, newRating);
+      }
+    } catch {
+      setFeedback(feedback); // revert on error
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
 
   return (
     <div className={`${styles.nodeGroup} ${isUser ? styles.nodeUser : styles.nodeAssistant}`}>
@@ -516,14 +758,50 @@ function MessageBubble({ message, isLastStreaming, assistantAvatar, onOpenSource
       <div className={styles.nodeContentPane}>
         {isUser && <div className={styles.nodeUserLabel}>Tú</div>}
         {isLastStreaming && message.content === "" ? (
-          <div className="dot-pulse"><span /><span /><span /></div>
+          <div className={styles.thinkingBubble}>
+            <div className={styles.thinkingDots}>
+              <span /><span /><span />
+            </div>
+            <span className={styles.thinkingLabel}>Pensando…</span>
+          </div>
         ) : (
           <div className={styles.nodeContent}>
-            {message.content.split("\n").map((line, i) => (
-              <span key={i} style={{ display: 'block', minHeight: line.trim() ? "auto" : "1em" }}>{line}</span>
-            ))}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={markdownComponents}
+            >
+              {message.content}
+            </ReactMarkdown>
           </div>
         )}
+
+        {/* Feedback buttons — only for completed assistant messages */}
+        {!isUser && !isLastStreaming && message.content !== "" && (
+          <div className={styles.feedbackRow}>
+            <button
+              className={`${styles.feedbackBtn} ${feedback === "up" ? styles.feedbackBtnUp : ""}`}
+              onClick={() => handleFeedback("up")}
+              disabled={feedbackLoading}
+              title="Respuesta útil"
+            >
+              👍
+            </button>
+            <button
+              className={`${styles.feedbackBtn} ${feedback === "down" ? styles.feedbackBtnDown : ""}`}
+              onClick={() => handleFeedback("down")}
+              disabled={feedbackLoading}
+              title="Respuesta poco útil"
+            >
+              👎
+            </button>
+            {feedback && (
+              <span className={styles.feedbackThanks}>
+                {feedback === "up" ? "¡Gracias!" : "Lo tendremos en cuenta"}
+              </span>
+            )}
+          </div>
+        )}
+
         {message.sources.length > 0 && (
           <div className={styles.nodeSources}>
             <button
@@ -557,9 +835,10 @@ function MessageBubble({ message, isLastStreaming, assistantAvatar, onOpenSource
   );
 }
 
+
 // ── DocumentsPanel ─────────────────────────────────────────────────────────────
 function DocumentsPanel({
-  assistantId, documents, onChange, onDeleteRequest, onOpenDocument, onOpenOriginal,
+  assistantId, documents, onChange, onDeleteRequest, onOpenDocument, onOpenOriginal, onUploadCompleted,
 }: {
   assistantId: string;
   documents: Document[];
@@ -567,6 +846,7 @@ function DocumentsPanel({
   onDeleteRequest: (doc: Document) => void;
   onOpenDocument: (documentId: string) => void;
   onOpenOriginal: (documentId: string) => void;
+  onUploadCompleted: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -580,6 +860,7 @@ function DocumentsPanel({
     try {
       const doc = await api.documents.upload(assistantId, file);
       onChange([doc, ...documents]);
+      onUploadCompleted();
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Error al subir");
     } finally {
@@ -720,8 +1001,26 @@ function fileIcon(type: string): string {
 
 function PageLoader() {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100dvh" }}>
-      <div className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", gap: "2rem" }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: "50%",
+        background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "1.5rem",
+        boxShadow: "0 0 30px var(--accent-glow)",
+        animation: "pulse 1.5s ease-in-out infinite"
+      }}>✦</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "min(420px, 80vw)" }}>
+        {["70%", "90%", "55%"].map((w, i) => (
+          <div key={i} style={{
+            height: 12, width: w, borderRadius: 99,
+            background: "var(--bg-hover)",
+            animation: `shimmer 1.6s ease-in-out ${i * 0.2}s infinite`,
+            backgroundImage: "linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-active) 50%, var(--bg-hover) 75%)",
+            backgroundSize: "200% 100%"
+          }} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -874,6 +1173,53 @@ function EditAssistantModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function ConversationList({
+  conversations, active, onSelect, onNew, onDelete
+}: {
+  conversations: Conversation[];
+  active: Conversation | null;
+  onSelect: (c: Conversation) => void;
+  onNew: () => void;
+  onDelete: (c: Conversation) => void;
+}) {
+  return (
+    <div className={styles.convList}>
+      <button className={`${styles.glowingBtn} w-full mb-4`} onClick={onNew}>
+        + Nueva conversación
+      </button>
+      <div className={styles.convItems}>
+        {conversations.length === 0 ? (
+          <p className="text-sm text-muted text-center py-4">No hay conversaciones</p>
+        ) : (
+          conversations.map(c => (
+            <div 
+              key={c.id} 
+              className={`${styles.convItem} ${active?.id === c.id ? styles.convActive : ""}`}
+              onClick={() => onSelect(c)}
+            >
+              <div className={styles.convInfo}>
+                <span className={styles.convTitle} title={c.title || "Nueva conversación"}>
+                  {c.title || "Nueva conversación"}
+                </span>
+                <span className={styles.convDate}>
+                  {new Date(c.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <button 
+                className={styles.convDelete} 
+                onClick={(e) => { e.stopPropagation(); onDelete(c); }}
+                title="Eliminar conversación"
+              >
+                ✕
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -247,3 +247,9 @@
   font-size: 1.25rem;
   color: var(--text-muted);
 }
+
+.analyticsSection {
+  margin-top: 4rem;
+  padding-top: 3rem;
+  border-top: 1px solid var(--border);
+}

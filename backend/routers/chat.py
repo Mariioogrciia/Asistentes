@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from backend.ai import AiDep
 from backend.db import DbDep
 from backend.auth import UserDep
+from backend.config import get_settings
 from backend.services.rag import build_messages, retrieve_context, stream_answer
 
 router = APIRouter(tags=["chat"])
@@ -252,11 +253,31 @@ def send_message(
                     }).execute()
 
                     # Update conversation title if first exchange
-                    if not conversation.get("title") and len(history) == 0:
-                        title = body.content[:80]
-                        db.table("conversations").update({"title": title}).eq(
-                            "id", str(conversation_id)
-                        ).execute()
+                    if (not conversation.get("title") or conversation.get("title") == "Nueva conversación") and len(history) == 0:
+                        try:
+                            title_prompt = (
+                                "Resume el siguiente mensaje de usuario en un título muy corto (máximo 5 palabras) "
+                                "para una conversación de chat. No uses comillas ni puntos finales.\n\n"
+                                f"Mensaje: {body.content}"
+                            )
+                            title_completion = ai.chat.completions.create(
+                                model=get_settings().azure_deployment_llm,
+                                messages=[{"role": "user", "content": title_prompt}],
+                                temperature=0.3,
+                                max_tokens=20,
+                            )
+                            new_title = (title_completion.choices[0].message.content or "").strip().replace('"', '')
+                            if new_title:
+                                db.table("conversations").update({"title": new_title}).eq(
+                                    "id", str(conversation_id)
+                                ).execute()
+                                logger.info("Auto-titled conversation_id={} to: {}", conversation_id, new_title)
+                        except Exception as e:
+                            logger.error("Failed to auto-title: {}", e)
+                            # Fallback if AI fails
+                            db.table("conversations").update({"title": body.content[:50] + "..."}).eq(
+                                "id", str(conversation_id)
+                            ).execute()
 
                     logger.info(
                         "Chat complete conversation_id={} tokens_approx={}",
@@ -295,4 +316,59 @@ def delete_conversation(
     db.table("messages").delete().eq("conversation_id", str(conversation_id)).execute()
     db.table("conversations").delete().eq("id", str(conversation_id)).execute()
     logger.info("Conversation deleted id={} by user_id={}", conversation_id, user.id)
+
+
+# ── Message Feedback ───────────────────────────────────────────────────────────
+
+class FeedbackCreate(BaseModel):
+    rating: str = Field(pattern="^(up|down)$")
+
+
+@router.post("/conversations/{conversation_id}/messages/{message_id}/feedback", status_code=200)
+def submit_feedback(
+    conversation_id: Annotated[uuid.UUID, Path()],
+    message_id: Annotated[uuid.UUID, Path()],
+    body: FeedbackCreate,
+    db: DbDep,
+    user: UserDep,
+) -> dict:
+    """Save or update a thumbs-up/down rating for an assistant message."""
+    # Verify conversation ownership
+    conv_query = db.table("conversations").select("id").eq("id", str(conversation_id))
+    if user.role != "admin":
+        conv_query = conv_query.eq("user_id", str(user.id))
+    conv_check = conv_query.maybe_single().execute()
+    if not conv_check.data:
+        raise HTTPException(status_code=404, detail="Conversation not found or access denied")
+
+    # Verify the message belongs to this conversation
+    msg_check = (
+        db.table("messages")
+        .select("id, role")
+        .eq("id", str(message_id))
+        .eq("conversation_id", str(conversation_id))
+        .maybe_single()
+        .execute()
+    )
+    if not msg_check.data:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if msg_check.data.get("role") != "assistant":
+        raise HTTPException(status_code=400, detail="Only assistant messages can be rated")
+
+    # Upsert: one rating per (message_id, user_id)
+    db.table("message_feedback").upsert(
+        {
+            "message_id": str(message_id),
+            "user_id": str(user.id),
+            "rating": body.rating,
+        },
+        on_conflict="message_id,user_id",
+    ).execute()
+
+    logger.info(
+        "Feedback {} for message_id={} by user_id={}",
+        body.rating, message_id, user.id,
+    )
+    return {"status": "ok", "rating": body.rating}
+
 

@@ -520,8 +520,30 @@ function CreateAssistantModal({
   const [instructions, setInstructions] = useState(
     "Eres un asistente útil y preciso. Responde siempre basándote en los documentos proporcionados. Si no encuentras la información en los documentos, indícalo claramente."
   );
+  const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  async function handleGeneratePrompt() {
+    if (!name.trim()) {
+      setError("Primero escribe el nombre del asistente para generar el prompt.");
+      return;
+    }
+
+    setGeneratingPrompt(true);
+    setError("");
+    try {
+      const result = await api.assistants.generateInstructions({
+        name: name.trim(),
+        description: description.trim() || undefined,
+      });
+      setInstructions(result.instructions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo generar el prompt con IA");
+    } finally {
+      setGeneratingPrompt(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -559,8 +581,33 @@ function CreateAssistantModal({
             <input id="desc" className="input" value={description} onChange={e => setDescription(e.target.value)} placeholder="¿Para qué sirve este asistente?" />
           </div>
           <div className="field">
-            <label htmlFor="instr">System prompt *</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "0.5rem" }}>
+              <label htmlFor="instr" style={{ marginBottom: 0 }}>System prompt *</label>
+              <button 
+                type="button" 
+                className="btn btn-ghost btn-sm" 
+                style={{ color: "var(--accent)", fontSize: "0.75rem", padding: "2px 8px", height: "auto" }}
+                onClick={async () => {
+                  if (!name.trim()) return alert("Introduce un nombre primero");
+                  setLoading(true);
+                  try {
+                    const res = await api.assistants.generateInstructions({ name, description });
+                    setInstructions(res.instructions);
+                  } catch (err) {
+                    alert("Error al generar prompt: " + (err instanceof Error ? err.message : "Desconocido"));
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading || !name.trim()}
+              >
+                ✨ Generar con IA
+              </button>
+            </div>
             <textarea id="instr" className="textarea" value={instructions} onChange={e => setInstructions(e.target.value)} rows={5} required />
+            <p className="text-xs text-muted" style={{ marginTop: "0.35rem" }}>
+              El prompt generado fuerza que el asistente use solo informacion de los documentos subidos.
+            </p>
           </div>
           {error && <p className="text-sm" style={{ color: "var(--error)" }}>{error}</p>}
           <div className="modal-footer">

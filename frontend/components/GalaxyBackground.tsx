@@ -17,11 +17,13 @@ export function GalaxyBackground() {
     canvas.height = height;
 
     const particles: Particle[] = [];
-    // Densidad dependiente del tamaño de la pantalla
-    const particleCount = Math.floor((width * height) / 9000); 
+    const particleCount = Math.floor((width * height) / 9000);
 
     const mouse = { x: -1000, y: -1000, radius: 180 };
     let isLightMode = document.documentElement.getAttribute("data-theme") === "light";
+    // Streaming state: 0 = idle, 1 = thinking/streaming
+    let streamIntensity = 0;
+    let streamTarget = 0;
 
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((m) => {
@@ -32,6 +34,12 @@ export function GalaxyBackground() {
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
+    // Listen for streaming events dispatched from ChatPanel
+    const handleStreamStart = () => { streamTarget = 1; };
+    const handleStreamEnd   = () => { streamTarget = 0; };
+    window.addEventListener("ai-stream-start", handleStreamStart);
+    window.addEventListener("ai-stream-end",   handleStreamEnd);
+
     class Particle {
       x: number;
       y: number;
@@ -40,7 +48,9 @@ export function GalaxyBackground() {
       size: number;
       density: number;
       alpha: number;
+      baseAlpha: number;
       colorIndex: number;
+      phase: number; // for pulsing
 
       constructor() {
         this.x = Math.random() * width;
@@ -49,58 +59,80 @@ export function GalaxyBackground() {
         this.baseY = this.y;
         this.size = Math.random() * 1.5 + 0.5;
         this.density = (Math.random() * 20) + 5;
-        this.alpha = Math.random() * 0.5 + 0.1;
+        this.baseAlpha = Math.random() * 0.5 + 0.1;
+        this.alpha = this.baseAlpha;
         this.colorIndex = Math.floor(Math.random() * 3);
+        this.phase = Math.random() * Math.PI * 2;
       }
 
       draw() {
         if (!ctx) return;
-        
+
         const darkColors = [
-          `rgba(164, 141, 255, ${this.alpha})`, 
-          `rgba(100, 70, 240, ${this.alpha})`,  
-          `rgba(220, 200, 255, ${this.alpha})`  
+          `rgba(164, 141, 255, ${this.alpha})`,
+          `rgba(100, 70, 240, ${this.alpha})`,
+          `rgba(220, 200, 255, ${this.alpha})`
         ];
-        
+
         const lightColors = [
           `rgba(109, 40, 217, ${this.alpha})`,
           `rgba(124, 92, 252, ${this.alpha})`,
           `rgba(88, 51, 230, ${this.alpha})`
         ];
 
-        const activeColors = isLightMode ? lightColors : darkColors;
-        const currentColor = activeColors[this.colorIndex];
+        // During streaming: shift toward cyan/teal
+        const streamColors = [
+          `rgba(56, 189, 248, ${this.alpha})`,
+          `rgba(34, 211, 238, ${this.alpha})`,
+          `rgba(99, 102, 241, ${this.alpha})`
+        ];
 
+        let currentColor: string;
+        if (streamIntensity > 0.5) {
+          // Lerp between normal and stream colors based on intensity
+          currentColor = streamColors[this.colorIndex];
+        } else {
+          const baseColors = isLightMode ? lightColors : darkColors;
+          currentColor = baseColors[this.colorIndex];
+        }
+
+        const glowSize = streamIntensity > 0 ? 10 + streamIntensity * 18 : 10;
         ctx.fillStyle = currentColor;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = glowSize;
         ctx.shadowColor = currentColor;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, this.size * (1 + streamIntensity * 0.5), 0, Math.PI * 2);
         ctx.closePath();
         ctx.fill();
         ctx.shadowBlur = 0;
       }
 
-      update() {
+      update(frame: number) {
+        // Pulse alpha when streaming
+        this.phase += 0.03 + streamIntensity * 0.07;
+        if (streamIntensity > 0) {
+          this.alpha = this.baseAlpha + Math.sin(this.phase) * streamIntensity * 0.35;
+          this.alpha = Math.max(0.05, Math.min(1, this.alpha));
+        } else {
+          this.alpha = this.baseAlpha;
+        }
+
         const dx = mouse.x - this.x;
         const dy = mouse.y - this.y;
         const distance = Math.hypot(dx, dy);
 
-        // Movimiento de repulsión (apartarse)
         if (distance < mouse.radius) {
           const forceDirectionX = dx / distance;
           const forceDirectionY = dy / distance;
           const force = (mouse.radius - distance) / mouse.radius;
           const directionX = forceDirectionX * force * this.density;
           const directionY = forceDirectionY * force * this.density;
-
           this.x -= directionX;
           this.y -= directionY;
         } else {
-          // Retorno suave (spring) a la posición original
           if (this.x !== this.baseX) {
             const dxBase = this.x - this.baseX;
-            this.x -= dxBase / 25; // Velocidad de retorno
+            this.x -= dxBase / 25;
           }
           if (this.y !== this.baseY) {
             const dyBase = this.y - this.baseY;
@@ -108,8 +140,9 @@ export function GalaxyBackground() {
           }
         }
 
-        // Float ambient
-        this.baseY -= 0.15; // Flotan hacia arriba lentamente
+        // Float upward faster during streaming
+        const riseSpeed = 0.15 + streamIntensity * 0.4;
+        this.baseY -= riseSpeed;
         if (this.baseY < -10) {
           this.baseY = height + 10;
           this.y = height + 10;
@@ -122,7 +155,7 @@ export function GalaxyBackground() {
     }
 
     for (let i = 0; i < particleCount; i++) {
-        particles.push(new Particle());
+      particles.push(new Particle());
     }
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -141,9 +174,9 @@ export function GalaxyBackground() {
       canvas.width = width;
       canvas.height = height;
       particles.length = 0;
-      const newParticleCount = Math.floor((width * height) / 9000);
-      for (let i = 0; i < newParticleCount; i++) {
-          particles.push(new Particle());
+      const newCount = Math.floor((width * height) / 9000);
+      for (let i = 0; i < newCount; i++) {
+        particles.push(new Particle());
       }
     };
 
@@ -152,13 +185,19 @@ export function GalaxyBackground() {
     window.addEventListener("resize", handleResize);
 
     let animationFrameId: number;
+    let frame = 0;
+
     function animate() {
       if (!ctx) return;
       ctx.clearRect(0, 0, width, height);
 
+      // Smooth lerp intensity toward target
+      streamIntensity += (streamTarget - streamIntensity) * 0.04;
+
       for (let i = 0; i < particles.length; i++) {
-        particles[i].update();
+        particles[i].update(frame);
       }
+      frame++;
       animationFrameId = requestAnimationFrame(animate);
     }
     animate();
@@ -167,6 +206,8 @@ export function GalaxyBackground() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseleave", handleMouseLeave);
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("ai-stream-start", handleStreamStart);
+      window.removeEventListener("ai-stream-end",   handleStreamEnd);
       cancelAnimationFrame(animationFrameId);
       observer.disconnect();
     };

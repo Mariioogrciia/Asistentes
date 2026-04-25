@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 // Initialize Supabase client
 export const supabase = createClient(
@@ -18,6 +18,20 @@ export interface Assistant {
   instructions: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface SuggestedQuestionsResponse {
+  questions: string[];
+  based_on_documents: boolean;
+}
+
+export interface GenerateInstructionsBody {
+  name: string;
+  description?: string;
+}
+
+export interface GenerateInstructionsResponse {
+  instructions: string;
 }
 
 export interface Document {
@@ -87,6 +101,25 @@ export interface AdminUserCreateBody {
   role?: "user" | "admin";
 }
 
+export interface UserStats {
+  total_messages: number;
+  estimated_tokens: number;
+  active_assistants: number;
+  top_documents: { name: string; hits: number }[];
+  activity_by_assistant: { name: string; count: number }[];
+}
+
+export interface AdminStats {
+  total_users: number;
+  total_assistants: number;
+  total_documents: number;
+  total_messages: number;
+  total_tokens_estimated: number;
+  popular_assistants: { name: string; count: number }[];
+  top_global_documents: { name: string; hits: number }[];
+  assistant_ratings: { name: string; up: number; down: number; total: number; score: number }[];
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -120,6 +153,10 @@ export const api = {
     list: (userId?: string) => req<Assistant[]>(`/assistants/${userId ? `?user_id=${userId}` : ""}`),
     create: (body: { name: string; description?: string; instructions: string }) =>
       req<Assistant>("/assistants/", { method: "POST", body: JSON.stringify(body) }),
+    generateInstructions: (body: GenerateInstructionsBody) =>
+      req<GenerateInstructionsResponse>("/assistants/generate-instructions", { method: "POST", body: JSON.stringify(body) }),
+    suggestedQuestions: (assistantId: string) =>
+      req<SuggestedQuestionsResponse>(`/assistants/${assistantId}/suggested-questions`),
     get: (id: string) => req<Assistant>(`/assistants/${id}`),
     update: (id: string, body: Partial<{ name: string; description: string; instructions: string }>) =>
       req<Assistant>(`/assistants/${id}`, { method: "PUT", body: JSON.stringify(body) }),
@@ -182,6 +219,11 @@ export const api = {
     },
     delete: (conversationId: string) =>
       req<void>(`/conversations/${conversationId}`, { method: "DELETE" }),
+    feedback: (conversationId: string, messageId: string, rating: "up" | "down") =>
+      req<{ status: string; rating: string }>(
+        `/conversations/${conversationId}/messages/${messageId}/feedback`,
+        { method: "POST", body: JSON.stringify({ rating }) }
+      ),
   },
 
   users: {
@@ -198,5 +240,10 @@ export const api = {
     getUser: () => supabase.auth.getUser(),
     signOut: () => supabase.auth.signOut(),
     listUsers: () => req<AdminUser[]>("/users/"),
+  },
+  
+  analytics: {
+    user: () => req<UserStats>("/analytics/user"),
+    admin: () => req<AdminStats>("/analytics/admin"),
   }
 };
