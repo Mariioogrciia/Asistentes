@@ -1,8 +1,10 @@
 """Router: CRUD operations for assistants."""
 
+import time
 import uuid
 from typing import Annotated
 
+import httpx
 from fastapi import APIRouter, HTTPException, Path
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -11,6 +13,32 @@ from backend.db import DbDep
 from backend.auth import UserDep
 
 router = APIRouter(prefix="/assistants", tags=["assistants"])
+
+
+def _execute_with_transient_retry(run_query, *, operation: str, max_retries: int = 2):
+    """Retry short-lived transport errors from Supabase/PostgREST."""
+    for attempt in range(max_retries + 1):
+        try:
+            return run_query()
+        except httpx.HTTPError as exc:
+            is_last = attempt >= max_retries
+            if is_last:
+                logger.error("Supabase request failed op={} error={}", operation, exc)
+                raise HTTPException(
+                    status_code=503,
+                    detail="Servicio de base de datos temporalmente no disponible. Intenta de nuevo.",
+                ) from exc
+
+            backoff_seconds = 0.2 * (2**attempt)
+            logger.warning(
+                "Transient DB error op={} attempt={}/{} backoff_s={} error={}",
+                operation,
+                attempt + 1,
+                max_retries + 1,
+                backoff_seconds,
+                exc,
+            )
+            time.sleep(backoff_seconds)
 
 
 # ── Pydantic schemas ───────────────────────────────────────────────────────────
@@ -46,23 +74,26 @@ def list_assistants(db: DbDep, user: UserDep, user_id: str | None = None) -> lis
     Default behavior: Users (including admins) see only their own assistants.
     Admin behavior: Can pass a specific 'user_id' to filter, or 'all' to see everything.
     """
-    query = db.table("assistants").select("*")
-    
-    if user.role == "admin":
-        if user_id == "all":
-            # Admin sees everything
-            pass
-        elif user_id:
-            # Admin sees a specific user's assistants
-            query = query.eq("user_id", user_id)
+    def run_query():
+        query = db.table("assistants").select("*")
+
+        if user.role == "admin":
+            if user_id == "all":
+                # Admin sees everything
+                pass
+            elif user_id:
+                # Admin sees a specific user's assistants
+                query = query.eq("user_id", user_id)
+            else:
+                # Admin sees their own by default
+                query = query.eq("user_id", str(user.id))
         else:
-            # Admin sees their own by default
+            # Regular users always see only their own
             query = query.eq("user_id", str(user.id))
-    else:
-        # Regular users always see only their own
-        query = query.eq("user_id", str(user.id))
-    
-    result = query.order("created_at", desc=True).execute()
+
+        return query.order("created_at", desc=True).execute()
+
+    result = _execute_with_transient_retry(run_query, operation="list_assistants")
     return result.data
 
 

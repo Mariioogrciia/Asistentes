@@ -326,11 +326,20 @@
   color: var(--text-primary);
 }
 .sourceNodeItem {
+  width: 100%;
+  text-align: left;
   background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-left: 2px solid var(--accent);
   padding: 0.75rem 1rem;
   border-radius: 0 8px 8px 0;
   animation: fadeIn 0.3s ease;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+.sourceNodeItem:hover {
+  border-color: var(--accent-mid);
+  background: var(--bg-hover);
 }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -466,3 +475,71 @@
 .docInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .docName { font-size: 0.8125rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .docMeta { display: flex; align-items: center; gap: 6px; }
+.docInfoButton {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.viewerModal {
+  width: min(900px, 96vw);
+  max-width: min(900px, 96vw) !important;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+}
+.viewerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.viewerBody {
+  flex: 1;
+  min-height: 260px;
+  max-height: 70dvh;
+  overflow: auto;
+  padding: 0.5rem 0.25rem;
+}
+.viewerState {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  min-height: 220px;
+  color: var(--text-muted);
+}
+.viewerChunkList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem 1rem;
+}
+.viewerChunk {
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+}
+.viewerChunkFocused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+.viewerChunkHeader {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.viewerChunkText {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-size: 0.9rem;
+}

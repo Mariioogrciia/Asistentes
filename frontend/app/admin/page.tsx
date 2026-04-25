@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, supabase } from "@/lib/api";
+import { api, supabase, type AdminUserCreateBody, type Assistant } from "@/lib/api";
 import styles from "./admin.module.css";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -15,17 +15,49 @@ interface UserProfile {
   updated_at: string;
 }
 
+interface NoticeState {
+  type: "success" | "error";
+  message: string;
+}
+
+interface ConfirmDialogState {
+  title: string;
+  message: string;
+  confirmText: string;
+  onConfirm: () => Promise<void>;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [allAssistants, setAllAssistants] = useState<any[]>([]);
+  const [allAssistants, setAllAssistants] = useState<Assistant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [tab, setTab] = useState<"users" | "assistants">("users");
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [userAssistants, setUserAssistants] = useState<any[]>([]);
+  const [userAssistants, setUserAssistants] = useState<Assistant[]>([]);
   const [loadingUserAssts, setLoadingUserAssts] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState<AdminUserCreateBody>({
+    email: "",
+    password: "",
+    full_name: "",
+    role: "user",
+  });
+
+  async function loadAdminData() {
+    const [allUsers, assts] = await Promise.all([
+      api.users.list(),
+      api.assistants.list("all"),
+    ]);
+    setUsers(allUsers);
+    setAllAssistants(assts);
+  }
 
   useEffect(() => {
     // Load cached profile
@@ -57,12 +89,7 @@ export default function AdminPage() {
 
         // Load all users and all assistants
         try {
-          const [allUsers, assts] = await Promise.all([
-            api.auth.listUsers(),
-            api.assistants.list("all")
-          ]);
-          setUsers(allUsers);
-          setAllAssistants(assts);
+          await loadAdminData();
         } catch (listErr: any) {
           console.error("Error al cargar datos:", listErr);
           setError(`Eres admin, pero no pudimos cargar los datos: ${listErr.message}`);
@@ -78,6 +105,68 @@ export default function AdminPage() {
     checkAdmin();
   }, [router]);
 
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    setCreatingUser(true);
+    try {
+      await api.users.create(createUserForm);
+      await loadAdminData();
+      setShowCreateUser(false);
+      setCreateUserForm({ email: "", password: "", full_name: "", role: "user" });
+      setNotice({ type: "success", message: "Usuario creado correctamente." });
+    } catch (err: any) {
+      setNotice({ type: "error", message: `No se pudo crear el usuario: ${err.message}` });
+    } finally {
+      setCreatingUser(false);
+    }
+  }
+
+  async function performDeleteUser(user: UserProfile) {
+    try {
+      await api.users.delete(user.id);
+      await loadAdminData();
+      if (selectedUser?.id === user.id) {
+        setSelectedUser(null);
+        setUserAssistants([]);
+      }
+      setNotice({ type: "success", message: "Usuario eliminado correctamente." });
+    } catch (err: any) {
+      setNotice({ type: "error", message: `No se pudo eliminar el usuario: ${err.message}` });
+    }
+  }
+
+  function handleDeleteUser(user: UserProfile) {
+    setConfirmDialog({
+      title: "Eliminar usuario",
+      message: `Vas a eliminar al usuario ${user.full_name || user.email} y todos sus datos. Esta accion es irreversible.`,
+      confirmText: "Eliminar usuario",
+      onConfirm: () => performDeleteUser(user),
+    });
+  }
+
+  async function performDeleteAssistant(assistant: Assistant) {
+    try {
+      await api.assistants.delete(assistant.id);
+      await loadAdminData();
+      if (selectedUser) {
+        const refreshed = await api.assistants.list(selectedUser.id);
+        setUserAssistants(refreshed);
+      }
+      setNotice({ type: "success", message: "Asistente eliminado correctamente." });
+    } catch (err: any) {
+      setNotice({ type: "error", message: `No se pudo eliminar el asistente: ${err.message}` });
+    }
+  }
+
+  function handleDeleteAssistant(assistant: Assistant) {
+    setConfirmDialog({
+      title: "Eliminar asistente",
+      message: `Vas a eliminar el asistente \"${assistant.name}\". Esta accion es irreversible.`,
+      confirmText: "Eliminar asistente",
+      onConfirm: () => performDeleteAssistant(assistant),
+    });
+  }
+
   async function handleViewUserAssistants(user: UserProfile) {
     setSelectedUser(user);
     setLoadingUserAssts(true);
@@ -85,10 +174,27 @@ export default function AdminPage() {
       const assts = await api.assistants.list(user.id);
       setUserAssistants(assts);
     } catch (err) {
-      alert("Error al cargar asistentes del usuario");
+      setNotice({ type: "error", message: "Error al cargar asistentes del usuario." });
     } finally {
       setLoadingUserAssts(false);
     }
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmDialog) return;
+    setConfirmLoading(true);
+    try {
+      await confirmDialog.onConfirm();
+      setConfirmDialog(null);
+    } finally {
+      setConfirmLoading(false);
+    }
+  }
+
+  function getUserLabelById(userId: string): string {
+    const owner = users.find((u) => u.id === userId);
+    if (!owner) return `Usuario no encontrado (${userId.slice(0, 8)}...)`;
+    return `${owner.full_name || "Sin nombre"} · ${owner.email}`;
   }
 
   if (loading) return <div className={styles.loading}>Cargando panel de administración...</div>;
@@ -121,6 +227,13 @@ export default function AdminPage() {
       </header>
 
       <div className={styles.content}>
+        {notice && (
+          <div className={`${styles.notice} ${notice.type === "success" ? styles.noticeSuccess : styles.noticeError}`}>
+            <span>{notice.message}</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => setNotice(null)}>Cerrar</button>
+          </div>
+        )}
+
         <div className={styles.statsRow}>
           <div className={styles.statCard}>
             <h3>Total Usuarios</h3>
@@ -150,6 +263,14 @@ export default function AdminPage() {
             Todos los Asistentes
           </button>
         </div>
+
+        {tab === "users" && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowCreateUser(true)}>
+              + Crear usuario
+            </button>
+          </div>
+        )}
 
         {tab === "users" ? (
           <div className={styles.tableWrapper}>
@@ -185,9 +306,14 @@ export default function AdminPage() {
                     <td className={styles.mono}>{u.id.slice(0, 8)}...</td>
                     <td className={styles.date}>{new Date(u.updated_at).toLocaleDateString()}</td>
                     <td>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleViewUserAssistants(u)}>
-                        🔍 Ver Asistentes
-                      </button>
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleViewUserAssistants(u)}>
+                          Ver Asistentes
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteUser(u)}>
+                          Eliminar usuario
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -200,9 +326,10 @@ export default function AdminPage() {
               <thead>
                 <tr>
                   <th>Asistente</th>
-                  <th>Propietario (User ID)</th>
+                  <th>Usuario vinculado</th>
                   <th>Instrucciones</th>
                   <th>Creado</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,13 +344,23 @@ export default function AdminPage() {
                         </div>
                       </div>
                     </td>
-                    <td className={styles.mono}>{a.user_id?.slice(0, 13) || "---"}...</td>
+                    <td>
+                      <div className={styles.userInfo}>
+                        <span className={styles.userName}>{getUserLabelById(a.user_id)}</span>
+                        <span className={styles.userEmail}>ID: {a.user_id.slice(0, 13)}...</span>
+                      </div>
+                    </td>
                     <td>
                       <div className={styles.instrPreview} title={a.instructions}>
                         {a.instructions?.slice(0, 50)}...
                       </div>
                     </td>
                     <td className={styles.date}>{new Date(a.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAssistant(a)}>
+                        Eliminar asistente
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -262,8 +399,13 @@ export default function AdminPage() {
                         <div style={{ fontWeight: 600 }}>{a.name}</div>
                         <div className="text-xs text-muted">{a.description || "Sin descripción"}</div>
                       </div>
-                      <div className="text-xs text-muted">
-                        {new Date(a.created_at).toLocaleDateString()}
+                      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                        <div className="text-xs text-muted">
+                          {new Date(a.created_at).toLocaleDateString()}
+                        </div>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAssistant(a)}>
+                          Eliminar
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -272,6 +414,84 @@ export default function AdminPage() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-primary" onClick={() => setSelectedUser(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateUser && (
+        <div className="modal-overlay" onClick={() => setShowCreateUser(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "500px" }}>
+            <div className="modal-header">
+              <h2>Crear nuevo usuario</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowCreateUser(false)}>✕</button>
+            </div>
+
+            <form onSubmit={handleCreateUser}>
+              <label className="label">Email</label>
+              <input
+                className="input"
+                type="email"
+                required
+                value={createUserForm.email}
+                onChange={(e) => setCreateUserForm((prev) => ({ ...prev, email: e.target.value }))}
+              />
+
+              <label className="label" style={{ marginTop: "0.75rem" }}>Password</label>
+              <input
+                className="input"
+                type="password"
+                minLength={8}
+                required
+                value={createUserForm.password}
+                onChange={(e) => setCreateUserForm((prev) => ({ ...prev, password: e.target.value }))}
+              />
+
+              <label className="label" style={{ marginTop: "0.75rem" }}>Nombre completo (opcional)</label>
+              <input
+                className="input"
+                value={createUserForm.full_name || ""}
+                onChange={(e) => setCreateUserForm((prev) => ({ ...prev, full_name: e.target.value }))}
+              />
+
+              <label className="label" style={{ marginTop: "0.75rem" }}>Rol</label>
+              <select
+                className="input"
+                value={createUserForm.role || "user"}
+                onChange={(e) => setCreateUserForm((prev) => ({ ...prev, role: e.target.value as "user" | "admin" }))}
+              >
+                <option value="user">user</option>
+                <option value="admin">admin</option>
+              </select>
+
+              <div className="modal-footer" style={{ marginTop: "1rem" }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowCreateUser(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={creatingUser}>
+                  {creatingUser ? "Creando..." : "Crear usuario"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div className="modal-overlay" onClick={() => !confirmLoading && setConfirmDialog(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "460px" }}>
+            <div className="modal-header">
+              <h2>{confirmDialog.title}</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setConfirmDialog(null)} disabled={confirmLoading}>✕</button>
+            </div>
+            <div style={{ marginBottom: "1rem", color: "var(--text-secondary)" }}>
+              {confirmDialog.message}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setConfirmDialog(null)} disabled={confirmLoading}>Cancelar</button>
+              <button className="btn btn-danger" onClick={handleConfirmAction} disabled={confirmLoading}>
+                {confirmLoading ? "Procesando..." : confirmDialog.confirmText}
+              </button>
             </div>
           </div>
         </div>

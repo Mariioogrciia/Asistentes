@@ -12,6 +12,7 @@ export const supabase = createClient(
 
 export interface Assistant {
   id: string;
+  user_id: string;
   name: string;
   description: string | null;
   instructions: string;
@@ -51,8 +52,39 @@ export interface Message {
 export interface Source {
   chunk_id: string;
   document_id: string;
+  document_filename?: string;
+  chunk_index?: number;
   content: string;
   similarity: number;
+}
+
+export interface DocumentChunk {
+  id: string;
+  document_id: string;
+  content: string;
+  chunk_index: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface DocumentOpenUrl {
+  url: string;
+  expires_in: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: "user" | "admin";
+  full_name: string | null;
+  avatar_url: string | null;
+  updated_at: string;
+}
+
+export interface AdminUserCreateBody {
+  email: string;
+  password: string;
+  full_name?: string;
+  role?: "user" | "admin";
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -97,6 +129,10 @@ export const api = {
   documents: {
     list: (assistantId: string) =>
       req<Document[]>(`/assistants/${assistantId}/documents/`),
+    chunks: (assistantId: string, documentId: string) =>
+      req<DocumentChunk[]>(`/assistants/${assistantId}/documents/${documentId}/chunks/`),
+    openUrl: (assistantId: string, documentId: string) =>
+      req<DocumentOpenUrl>(`/assistants/${assistantId}/documents/${documentId}/open-url`),
     upload: async (assistantId: string, file: File) => {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -152,11 +188,15 @@ export const api = {
     me: () => req<any>("/users/me"),
     updateProfile: (body: { full_name?: string; avatar_url?: string }) =>
       req<any>("/users/me", { method: "PUT", body: JSON.stringify(body) }),
+    list: () => req<AdminUser[]>("/users/"),
+    create: (body: AdminUserCreateBody) =>
+      req<AdminUser>("/users/", { method: "POST", body: JSON.stringify(body) }),
+    delete: (userId: string) => req<void>(`/users/${userId}`, { method: "DELETE" }),
   },
 
   auth: {
     getUser: () => supabase.auth.getUser(),
     signOut: () => supabase.auth.signOut(),
-    listUsers: () => req<any[]>("/users/"),
+    listUsers: () => req<AdminUser[]>("/users/"),
   }
 };

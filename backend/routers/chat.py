@@ -204,15 +204,46 @@ def send_message(
                 if chunk.startswith("data: [DONE]"):
                     # Persist complete assistant answer
                     assistant_content = "".join(full_answer).replace("\\n", "\n")
-                    sources = [
+
+                    document_ids = list(
                         {
-                            "chunk_id": str(c.get("id")),
-                            "document_id": str(c.get("document_id")),
-                            "content": c.get("content", ""),
-                            "similarity": c.get("similarity"),
+                            str(c.get("document_id"))
+                            for c in context_chunks
+                            if c.get("document_id")
                         }
-                        for c in context_chunks
-                    ]
+                    )
+                    document_name_by_id: dict[str, str] = {}
+                    if document_ids:
+                        docs_result = (
+                            db.table("documents")
+                            .select("id, filename")
+                            .in_("id", document_ids)
+                            .execute()
+                        )
+                        document_name_by_id = {
+                            str(d.get("id")): d.get("filename", "Documento")
+                            for d in (docs_result.data or [])
+                        }
+
+                    sources = []
+                    for c in context_chunks:
+                        metadata = c.get("metadata") or {}
+                        raw_chunk_index = metadata.get("chunk_index", -1)
+                        try:
+                            chunk_index = int(raw_chunk_index)
+                        except (TypeError, ValueError):
+                            chunk_index = -1
+
+                        sources.append(
+                            {
+                                "chunk_id": str(c.get("id")),
+                                "document_id": str(c.get("document_id")),
+                                "document_filename": document_name_by_id.get(str(c.get("document_id")), "Documento"),
+                                "chunk_index": chunk_index,
+                                "content": c.get("content", ""),
+                                "similarity": c.get("similarity"),
+                            }
+                        )
                     db.table("messages").insert({
                         "conversation_id": str(conversation_id),
                         "role": "assistant",

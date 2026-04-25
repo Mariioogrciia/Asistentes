@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, type Assistant, type Conversation, type Document, type Message, supabase } from "@/lib/api";
+import { api, type Assistant, type Conversation, type Document, type DocumentChunk, type Message, type Source, supabase } from "@/lib/api";
 import styles from "./page.module.css";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { GalaxyBackground } from "@/components/GalaxyBackground";
 
 export default function AssistantPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,7 +15,6 @@ export default function AssistantPage() {
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [tab, setTab] = useState<"chat" | "docs">("chat");
   const [loading, setLoading] = useState(true);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [convToDelete, setConvToDelete] = useState<Conversation | null>(null);
@@ -24,6 +22,11 @@ export default function AssistantPage() {
   const [avatar, setAvatar] = useState("✦");
   const [drawer, setDrawer] = useState<"none" | "history" | "docs">("none");
   const [profile, setProfile] = useState<any>(null);
+  const [viewerDocument, setViewerDocument] = useState<Document | null>(null);
+  const [viewerChunks, setViewerChunks] = useState<DocumentChunk[]>([]);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState("");
+  const [viewerFocusChunkId, setViewerFocusChunkId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id && typeof window !== "undefined") {
@@ -96,6 +99,40 @@ export default function AssistantPage() {
     setMessages(msgs);
   }
 
+  const openDocumentViewer = useCallback(async (documentId: string, focusChunkId?: string) => {
+    const selectedDoc = documents.find((d) => d.id === documentId);
+    if (!selectedDoc) return;
+
+    setViewerDocument(selectedDoc);
+    setViewerChunks([]);
+    setViewerError("");
+    setViewerLoading(true);
+    setViewerFocusChunkId(focusChunkId ?? null);
+    setDrawer("none");
+
+    try {
+      const chunks = await api.documents.chunks(id, documentId);
+      setViewerChunks(chunks);
+    } catch (err) {
+      setViewerError(err instanceof Error ? err.message : "No se pudo cargar el contenido del documento.");
+    } finally {
+      setViewerLoading(false);
+    }
+  }, [documents, id]);
+
+  const openDocumentOriginal = useCallback(async (documentId: string) => {
+    try {
+      const result = await api.documents.openUrl(id, documentId);
+      window.open(result.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      alert("No se pudo abrir el archivo original.");
+    }
+  }, [id]);
+
+  const handleOpenSource = useCallback((source: Source) => {
+    openDocumentViewer(source.document_id, source.chunk_id);
+  }, [openDocumentViewer]);
+
   if (loading) return <PageLoader />;
   if (!assistant) return null;
 
@@ -151,7 +188,14 @@ export default function AssistantPage() {
             {drawer === "history" ? (
               <ConversationList conversations={conversations} active={activeConv} onSelect={(c) => { handleSelectConv(c); setDrawer("none"); }} onNew={() => { handleNewConversation(); setDrawer("none"); }} onDelete={(c) => setConvToDelete(c)} />
             ) : (
-              <DocumentsPanel assistantId={id} documents={documents} onChange={setDocuments} onDeleteRequest={setDocToDelete} />
+              <DocumentsPanel
+                assistantId={id}
+                documents={documents}
+                onChange={setDocuments}
+                onDeleteRequest={setDocToDelete}
+                onOpenDocument={(documentId) => openDocumentViewer(documentId)}
+                onOpenOriginal={openDocumentOriginal}
+              />
             )}
           </div>
         </div>
@@ -160,7 +204,14 @@ export default function AssistantPage() {
       {/* Main Chat Canvas */}
       <main className={styles.chatCanvas}>
         {activeConv ? (
-          <ChatPanel conversation={activeConv} messages={messages} onNewMessage={(msg) => setMessages(prev => [...prev, msg])} onUpdateLastMessage={(content) => setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content } : m))} />
+          <ChatPanel
+            conversation={activeConv}
+            messages={messages}
+            onNewMessage={(msg) => setMessages(prev => [...prev, msg])}
+            onUpdateLastMessage={(content) => setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content } : m))}
+            onReplaceMessages={setMessages}
+            onSourceOpen={handleOpenSource}
+          />
         ) : (
           <div className={styles.emptyCanvas}>
             <div className={styles.emptyCanvasIcon}>✨</div>
@@ -225,6 +276,23 @@ export default function AssistantPage() {
           }}
         />
       )}
+
+      {viewerDocument && (
+        <DocumentViewerModal
+          document={viewerDocument}
+          chunks={viewerChunks}
+          loading={viewerLoading}
+          error={viewerError}
+          focusChunkId={viewerFocusChunkId}
+          onClose={() => {
+            setViewerDocument(null);
+            setViewerChunks([]);
+            setViewerError("");
+            setViewerFocusChunkId(null);
+          }}
+          onOpenOriginal={() => openDocumentOriginal(viewerDocument.id)}
+        />
+      )}
     </div>
   );
 }
@@ -272,12 +340,14 @@ function ConversationList({
 
 // ── ChatPanel ──────────────────────────────────────────────────────────────────
 function ChatPanel({
-  conversation, messages, onNewMessage, onUpdateLastMessage,
+  conversation, messages, onNewMessage, onUpdateLastMessage, onReplaceMessages, onSourceOpen,
 }: {
   conversation: Conversation;
   messages: Message[];
   onNewMessage: (m: Message) => void;
   onUpdateLastMessage: (content: string) => void;
+  onReplaceMessages: (messages: Message[]) => void;
+  onSourceOpen: (source: Source) => void;
 }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -341,14 +411,22 @@ function ChatPanel({
         const { value, done } = await reader.read();
         if (done) break;
         const text = decoder.decode(value, { stream: true });
+        let shouldStop = false;
         for (const line of text.split("\n")) {
           if (!line.startsWith("data: ")) continue;
           const data = line.slice(6);
-          if (data === "[DONE]" || data === "[ERROR]") break;
+          if (data === "[DONE]" || data === "[ERROR]") {
+            shouldStop = true;
+            break;
+          }
           accumulated += data.replace(/\\n/g, "\n");
           onUpdateLastMessage(accumulated);
         }
+        if (shouldStop) break;
       }
+
+      const synced = await api.conversations.messages(conversation.id);
+      onReplaceMessages(synced);
     } catch {
       onUpdateLastMessage("⚠️ Error al conectar con el asistente.");
     } finally {
@@ -378,7 +456,13 @@ function ChatPanel({
           </div>
         )}
         {messages.map((msg, i) => (
-          <MessageBubble key={msg.id} message={msg} isLastStreaming={streaming && i === messages.length - 1} assistantAvatar={localStorage.getItem(`avatar_${conversation.assistant_id}`) || "✦"} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            isLastStreaming={streaming && i === messages.length - 1}
+            assistantAvatar={localStorage.getItem(`avatar_${conversation.assistant_id}`) || "✦"}
+            onOpenSource={onSourceOpen}
+          />
         ))}
         <div ref={bottomRef} />
       </div>
@@ -417,7 +501,7 @@ function ChatPanel({
 }
 
 // ── Node Stream (No classic bubbles) ──────────────────────────────────────────
-function MessageBubble({ message, isLastStreaming, assistantAvatar }: { message: Message; isLastStreaming: boolean; assistantAvatar: string }) {
+function MessageBubble({ message, isLastStreaming, assistantAvatar, onOpenSource }: { message: Message; isLastStreaming: boolean; assistantAvatar: string; onOpenSource: (source: Source) => void }) {
   const isUser = message.role === "user";
   const [showSources, setShowSources] = useState(false);
 
@@ -451,10 +535,20 @@ function MessageBubble({ message, isLastStreaming, assistantAvatar }: { message:
               {showSources ? "▲" : "▼"}
             </button>
             {showSources && message.sources.map((s, i) => (
-              <div key={i} className={styles.sourceNodeItem}>
-                <div className={styles.sourceScore}>Ref: {Math.round(s.similarity * 100)}%</div>
-                <p className={styles.sourceText}>{s.content.slice(0, 200)}…</p>
-              </div>
+              <button
+                key={`${s.chunk_id}-${i}`}
+                type="button"
+                className={styles.sourceNodeItem}
+                onClick={() => onOpenSource(s)}
+                title="Abrir este fragmento en el documento"
+              >
+                <div className={styles.sourceScore}>
+                  {s.document_filename || "Documento"}
+                  {typeof s.chunk_index === "number" && s.chunk_index >= 0 ? ` · Fragmento ${s.chunk_index + 1}` : ""}
+                  {` · Ref: ${Math.round(s.similarity * 100)}%`}
+                </div>
+                <p className={styles.sourceText}>{s.content.slice(0, 220)}…</p>
+              </button>
             ))}
           </div>
         )}
@@ -465,12 +559,14 @@ function MessageBubble({ message, isLastStreaming, assistantAvatar }: { message:
 
 // ── DocumentsPanel ─────────────────────────────────────────────────────────────
 function DocumentsPanel({
-  assistantId, documents, onChange, onDeleteRequest,
+  assistantId, documents, onChange, onDeleteRequest, onOpenDocument, onOpenOriginal,
 }: {
   assistantId: string;
   documents: Document[];
   onChange: (docs: Document[]) => void;
   onDeleteRequest: (doc: Document) => void;
+  onOpenDocument: (documentId: string) => void;
+  onOpenOriginal: (documentId: string) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -521,21 +617,97 @@ function DocumentsPanel({
         ) : documents.map(doc => (
           <div key={doc.id} className={styles.docItem}>
             <span className={styles.docIcon}>{fileIcon(doc.file_type)}</span>
-            <div className={styles.docInfo}>
-              <span className={`${styles.docName} truncate`} title={doc.filename}>{doc.filename}</span>
-              <div className={styles.docMeta}>
-                <span className={`badge badge-${doc.status}`}>
-                  {doc.status === "processing" && <span className="spinner" style={{width:10,height:10}} />}
-                  {doc.status}
-                </span>
-                {doc.chunk_count > 0 && (
-                  <span className="text-xs text-muted">{doc.chunk_count} chunks</span>
-                )}
+            <button type="button" className={styles.docInfoButton} onClick={() => onOpenDocument(doc.id)} title="Abrir visor del documento">
+              <div className={styles.docInfo}>
+                <span className={`${styles.docName} truncate`} title={doc.filename}>{doc.filename}</span>
+                <div className={styles.docMeta}>
+                  <span className={`badge badge-${doc.status}`}>
+                    {doc.status === "processing" && <span className="spinner" style={{width:10,height:10}} />}
+                    {doc.status}
+                  </span>
+                  {doc.chunk_count > 0 && (
+                    <span className="text-xs text-muted">{doc.chunk_count} chunks</span>
+                  )}
+                </div>
               </div>
-            </div>
+            </button>
+            <button
+              className="btn btn-icon btn-ghost btn-sm"
+              onClick={() => onOpenOriginal(doc.id)}
+              title="Abrir archivo original"
+            >
+              ↗
+            </button>
             <button className="btn btn-icon btn-danger btn-sm" onClick={() => handleDelete(doc)} title="Eliminar">✕</button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function DocumentViewerModal({
+  document: doc,
+  chunks,
+  loading,
+  error,
+  focusChunkId,
+  onClose,
+  onOpenOriginal,
+}: {
+  document: Document;
+  chunks: DocumentChunk[];
+  loading: boolean;
+  error: string;
+  focusChunkId: string | null;
+  onClose: () => void;
+  onOpenOriginal: () => void;
+}) {
+  useEffect(() => {
+    if (!focusChunkId) return;
+    const target = window.document.getElementById(`chunk-${focusChunkId}`);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusChunkId, chunks]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className={`${styles.viewerModal} modal`} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h2>{doc.filename}</h2>
+            <p className="text-xs text-muted">{chunks.length} fragmentos indexados</p>
+          </div>
+          <div className={styles.viewerActions}>
+            <button type="button" className="btn btn-ghost" onClick={onOpenOriginal}>Abrir original</button>
+            <button type="button" className="btn btn-icon btn-ghost" onClick={onClose}>✕</button>
+          </div>
+        </div>
+
+        <div className={styles.viewerBody}>
+          {loading && (
+            <div className={styles.viewerState}><span className="spinner" /> Cargando contenido…</div>
+          )}
+          {!loading && error && (
+            <div className={styles.viewerState} style={{ color: "var(--error)" }}>{error}</div>
+          )}
+          {!loading && !error && chunks.length === 0 && (
+            <div className={styles.viewerState}>No hay fragmentos para este documento.</div>
+          )}
+          {!loading && !error && chunks.length > 0 && (
+            <div className={styles.viewerChunkList}>
+              {chunks.map((chunk) => (
+                <article
+                  id={`chunk-${chunk.id}`}
+                  key={chunk.id}
+                  className={`${styles.viewerChunk} ${focusChunkId === chunk.id ? styles.viewerChunkFocused : ""}`}
+                >
+                  <header className={styles.viewerChunkHeader}>Fragmento {chunk.chunk_index + 1}</header>
+                  <p className={styles.viewerChunkText}>{chunk.content}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
