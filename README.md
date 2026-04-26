@@ -7,104 +7,133 @@ Plataforma premium de **Retrieval-Augmented Generation (RAG)** que permite crear
 
 ---
 
-## 🚀 Características Principales
+## 📖 Descripción del Producto
 
-- **Gestión Multi-Asistente**: Crea múltiples asistentes independientes, cada uno con sus propias instrucciones (System Prompt) y base de conocimientos.
-- **Pipeline de Ingesta Inteligente**: Procesa archivos PDF, DOCX, PPTX, TXT y Markdown.
-    - **Chunking**: Segmentación recursiva de texto para mantener el contexto.
-    - **Embeddings**: Generación de vectores mediante Azure OpenAI (`text-embedding-3-small`).
-    - **Vector Store**: Almacenamiento y búsqueda semántica ultra-rápida con Supabase (`pgvector`).
-- **Chat en Tiempo Real**: Experiencia de usuario fluida con respuestas en streaming (Server-Sent Events) e indicadores de escritura.
-- **Organización Inteligente**: Almacenamiento de archivos en Supabase Storage organizado automáticamente por el nombre del asistente.
-- **Diseño Premium**: Interfaz moderna "Dark Mode" con estética minimalista y animaciones fluidas.
+**RAG Assistants** resuelve el problema de la sobrecarga de información y la falta de contexto en los modelos de lenguaje genéricos. Permite a usuarios y empresas crear "expertos" digitales que responden basándose exclusivamente en sus propios documentos (PDF, DOCX, etc.), garantizando respuestas precisas, citadas y libres de alucinaciones.
+
+**¿Qué hace?**
+- Permite crear múltiples asistentes con personalidades y conocimientos únicos.
+- Procesa y vectoriza documentos para búsqueda semántica.
+- Proporciona una interfaz de chat fluida con streaming y gestión de fuentes.
+- Ofrece un dashboard de analíticas para monitorizar el uso y feedback.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-### Backend (Core & AI)
-- **FastAPI**: API robusta y asíncrona con tipado fuerte.
-- **Azure OpenAI**: Potencia el motor de lenguaje (GPT-4o-mini) y la generación de embeddings.
-- **Supabase**: Backend-as-a-Service para la base de datos Postgres y el almacenamiento de archivos.
-- **Loguru**: Logging estructurado para monitorizar cada paso de la ingesta y el chat.
-
-### Frontend (UI/UX)
-- **Next.js 14+**: App Router para una navegación instantánea.
-- **Vanilla CSS Modules**: Control total sobre el diseño sin dependencias pesadas.
-- **Streaming SSE**: Conexión directa con el backend para recibir tokens palabra por palabra.
+- **Frontend**: Next.js 14 (App Router), TypeScript, Vanilla CSS Modules.
+- **Backend**: FastAPI (Python 3.11+), Pydantic v2.
+- **IA**: Azure OpenAI (GPT-4o-mini para chat, text-embedding-3-small para vectores).
+- **Base de Datos**: Supabase (PostgreSQL + pgvector).
+- **Almacenamiento**: Supabase Storage.
+- **Logging**: Loguru para trazabilidad estructurada.
 
 ---
 
-## ⚙️ Configuración del Entorno
+## 🏗️ Arquitectura del Sistema
 
-El proyecto utiliza un archivo `.env` en la raíz para la configuración global.
+El sistema sigue una arquitectura de RAG clásico con una capa de servicios desacoplada:
 
-```env
-# Azure OpenAI (Foundry / AI Studio)
-AZURE_OPENAI_API_KEY=tu_api_key
-AZURE_OPENAI_ENDPOINT=https://tu-endpoint.services.ai.azure.com/
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
-AZURE_DEPLOYMENT_LLM=gpt-4o-mini
-AZURE_DEPLOYMENT_EMBEDDING=text-embedding-3-small
+```mermaid
+graph TD
+    User((Usuario))
+    FE[Frontend - Next.js]
+    BE[Backend - FastAPI]
+    DB[(Postgres + pgvector)]
+    Storage[Supabase Storage]
+    AI[Azure OpenAI]
 
-# Supabase
-SUPABASE_URL=tu_url_de_proyecto
-SUPABASE_SERVICE_KEY=tu_service_role_key
-SUPABASE_BUCKET=documents
+    User <--> FE
+    FE <--> BE
+    BE <--> DB
+    BE <--> Storage
+    BE <--> AI
+    
+    subgraph "Pipeline de Ingesta"
+        Doc[Documento] --> Parse[Parsing & Chunking]
+        Parse --> Embed[Embeddings AI]
+        Embed --> DB
+    end
 
-# RAG Tuning (Opcional)
-CHUNK_SIZE=800
-CHUNK_OVERLAP=100
-RETRIEVAL_MIN_SCORE=0.40
+    subgraph "Pipeline de Chat"
+        Query[Pregunta] --> Search[Búsqueda Vectorial]
+        Search --> Context[Inyección de Contexto]
+        Context --> Gen[Generación AI]
+        Gen --> Stream[SSE Streaming]
+    end
 ```
 
 ---
 
-## 📦 Instalación
+## 🎨 Decisiones de Diseño
 
-### 1. Clonar y preparar el Backend
+### Técnicas
+- **FastAPI + SSE**: Se eligió Server-Sent Events en lugar de WebSockets para el streaming de respuestas por su simplicidad, menor sobrecarga de red y reconexión automática nativa en el navegador.
+- **pgvector**: Almacenar los vectores directamente en la base de datos relacional (Supabase) permite realizar filtros complejos (como el aislamiento por `assistant_id`) de forma atómica y eficiente sin necesidad de un Vector DB externo.
+- **Chunking Recursivo**: Se implementó `RecursiveCharacterTextSplitter` para asegurar que los fragmentos de texto mantengan coherencia semántica, evitando cortes abruptos en medio de oraciones.
+
+### Producto / UX
+- **Estética HUD (Heads-Up Display)**: Se optó por una interfaz inmersiva y oscura para reducir la fatiga visual y dar una sensación de herramienta avanzada y técnica.
+- **Dynamic Island Navigation**: Una navegación flotante que se adapta al contexto, maximizando el espacio de lectura para los documentos y el chat.
+- **Citas Integradas**: En lugar de mostrar fuentes al final, se permite inspeccionar exactamente qué fragmento de qué documento generó la respuesta para generar confianza en el usuario.
+
+---
+
+## 🚀 Guía de Ejecución Local
+
+### Requisitos Previos
+- Python 3.11+
+- Node.js 18+
+- Cuenta de Supabase y Azure OpenAI
+
+### 1. Configuración del Entorno
+Crea un archivo `.env` en la raíz del proyecto (basado en `.env.example`):
+```env
+AZURE_OPENAI_API_KEY=...
+AZURE_OPENAI_ENDPOINT=...
+SUPABASE_URL=...
+SUPABASE_SERVICE_KEY=...
+```
+
+### 2. Backend (FastAPI)
 ```bash
-# Crear entorno virtual
+# Crear y activar entorno virtual
 python -m venv venv
-source venv/bin/activate  # venv\Scripts\activate en Windows
+source venv/bin/activate  # En Windows: venv\Scripts\activate
 
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Ejecutar servidor
+# Iniciar servidor
 uvicorn backend.main:app --reload --port 8000
 ```
 
-### 2. Preparar el Frontend
+### 3. Frontend (Next.js)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+La aplicación estará disponible en `http://localhost:3000`.
 
 ---
 
-## 📂 Estructura del Proyecto
+## 🛡️ Cumplimiento del Core (RAG & Lógica)
 
-```text
-├── backend/            # Lógica de servidor, RAG e ingesta
-│   ├── routers/        # Endpoints de la API
-│   ├── services/       # Pipeline de documentos y búsqueda vectorial
-│   └── ai.py           # Clientes de Azure OpenAI
-├── frontend/           # Aplicación Next.js
-│   ├── app/            # Páginas y componentes (App Router)
-│   └── lib/            # Cliente de API tipado
-├── logs/               # Registros estructurados (JSONL)
-└── requirements.txt    # Dependencias de Python
+### 1. Aislamiento por Asistente en el Retrieval
+El aislamiento se garantiza a nivel de base de datos mediante filtros estrictos en las consultas SQL/RPC. Cada fragmento (`chunk`) en la tabla `chunks` tiene una relación con un `assistant_id`. Cuando un usuario pregunta a un asistente específico, la función de búsqueda vectorial `match_chunks` incluye un filtro obligatorio:
+```sql
+WHERE chunks.assistant_id = assistant_id_filter
 ```
+Esto asegura que, aunque haya millones de documentos, un asistente jamás tendrá acceso al contexto de otro.
 
----
+### 2. Implementación de Persistencia y Memoria
+- **Persistencia**: Todas las conversaciones y mensajes se guardan en las tablas `conversations` y `messages` de Supabase.
+- **Memoria de Corto Plazo**: En cada interacción, el backend recupera los últimos 10 mensajes de la conversación (`history`) y los inyecta en el prompt enviado a la IA, permitiendo el seguimiento de hilos conversacionales y referencias a mensajes anteriores.
 
-## 🛡️ Seguridad y Buenas Prácticas
-
-- **Sanitización ASCII**: Los nombres de archivos y carpetas en Storage se limpian automáticamente para cumplir con los estándares de la nube.
-- **Inyección de Dependencias**: Gestión eficiente de clientes de base de datos e IA.
-- **Aislamiento**: Los documentos y fragmentos están aislados por `assistant_id` para garantizar la privacidad de cada base de conocimientos.
+### 3. Gestión de Citas y "No Inventar"
+- **Citas**: Cada respuesta de la IA se guarda junto con un array de `sources` (metadatos de los fragmentos recuperados). El frontend utiliza estos metadatos para mostrar exactamente qué documentos se consultaron.
+- **No Inventar (Grounding)**: Se implementa mediante **Prompt Engineering Estricto**. El `system_prompt` de cada asistente incluye instrucciones imperativas: *"Responde SOLO usando la información de los documentos proporcionados. Si la respuesta no está en el contexto, di: 'No encuentro esa información' y no intentes adivinar"*.
 
 ---
 Creado por el equipo de **Antigravity**. 🚀
