@@ -136,4 +136,3 @@ Esto asegura que, aunque haya millones de documentos, un asistente jamás tendr�
 - **No Inventar (Grounding)**: Se implementa mediante **Prompt Engineering Estricto**. El `system_prompt` de cada asistente incluye instrucciones imperativas: *"Responde SOLO usando la información de los documentos proporcionados. Si la respuesta no está en el contexto, di: 'No encuentro esa información' y no intentes adivinar"*.
 
 ---
-Creado por el equipo de **Antigravity**. 🚀
